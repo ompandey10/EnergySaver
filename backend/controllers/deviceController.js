@@ -81,7 +81,9 @@ const getHomeDevices = asyncHandler(async (req, res) => {
         });
     }
 
-    const devices = await Device.find({ home: homeId, isActive: true });
+    // Get all devices for this home (including inactive/turned off ones)
+    // Only exclude soft-deleted devices (isDeleted: true)
+    const devices = await Device.find({ home: homeId, isDeleted: { $ne: true } });
 
     res.status(200).json({
         success: true,
@@ -225,8 +227,9 @@ const deleteDevice = asyncHandler(async (req, res) => {
         });
     }
 
-    // Soft delete
-    device.isActive = false;
+    // Soft delete - mark as deleted instead of removing
+    device.isDeleted = true;
+    device.deletedAt = new Date();
     await device.save();
 
     res.status(200).json({

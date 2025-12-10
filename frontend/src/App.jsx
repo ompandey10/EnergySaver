@@ -5,9 +5,11 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import Homes from './pages/Homes';
 import Devices from './pages/Devices';
+import DeviceDetail from './pages/DeviceDetail';
 import Alerts from './pages/Alerts';
 import Reports from './pages/Reports';
 
@@ -30,6 +32,7 @@ function App() {
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
             {/* Protected Routes */}
@@ -54,6 +57,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Devices />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/devices/:deviceId"
+              element={
+                <ProtectedRoute>
+                  <DeviceDetail />
                 </ProtectedRoute>
               }
             />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,6 +10,9 @@ import Button from '../components/common/Button';
 
 const Login = () => {
     const [isLoading, setIsLoading] = useState(false);
+    const [rememberMe, setRememberMe] = useState(
+        localStorage.getItem('rememberMe') === 'true'
+    );
     const { login } = useAuth();
     const navigate = useNavigate();
 
@@ -17,12 +20,31 @@ const Login = () => {
         register,
         handleSubmit,
         formState: { errors },
+        setValue,
     } = useForm({
         resolver: zodResolver(loginSchema),
     });
 
+    // Load remembered email on mount
+    useEffect(() => {
+        const savedEmail = localStorage.getItem('rememberedEmail');
+        if (savedEmail) {
+            setValue('email', savedEmail);
+        }
+    }, [setValue]);
+
     const onSubmit = async (data) => {
         setIsLoading(true);
+
+        // Handle remember me functionality
+        if (rememberMe) {
+            localStorage.setItem('rememberedEmail', data.email);
+            localStorage.setItem('rememberMe', 'true');
+        } else {
+            localStorage.removeItem('rememberedEmail');
+            localStorage.setItem('rememberMe', 'false');
+        }
+
         const result = await login(data.email, data.password);
         setIsLoading(false);
 
@@ -70,7 +92,12 @@ const Login = () => {
 
                         <div className="flex items-center justify-between">
                             <label className="flex items-center">
-                                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                <input
+                                    type="checkbox"
+                                    checked={rememberMe}
+                                    onChange={(e) => setRememberMe(e.target.checked)}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
                                 <span className="ml-2 text-sm text-gray-600">Remember me</span>
                             </label>
                             <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700">

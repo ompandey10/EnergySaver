@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit, Trash2, MapPin, Zap } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
+import Input from '../components/common/Input';
 import Spinner from '../components/common/Spinner';
 import Modal from '../components/common/Modal';
 import Badge from '../components/common/Badge';
@@ -11,6 +15,15 @@ import { homeService } from '../services/homeService';
 import { formatCurrency, formatEnergy } from '../utils/helpers';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+
+const homeSchema = z.object({
+    name: z.string().min(1, 'Home name is required'),
+    street: z.string().min(1, 'Street address is required'),
+    city: z.string().min(1, 'City is required'),
+    state: z.string().min(1, 'State is required'),
+    zipCode: z.string().regex(/^\d{5}(-\d{4})?$/, 'ZIP code must be 5 digits (e.g., 12345)'),
+    electricityRate: z.coerce.number().min(0, 'Electricity rate must be positive').optional(),
+});
 
 const Homes = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,6 +33,28 @@ const Homes = () => {
     const { data, isLoading } = useQuery({
         queryKey: ['homes'],
         queryFn: homeService.getHomes,
+    });
+
+    const {
+        register,
+        handleSubmit,
+        formState: { errors },
+        reset,
+    } = useForm({
+        resolver: zodResolver(homeSchema),
+    });
+
+    const createMutation = useMutation({
+        mutationFn: homeService.createHome,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['homes'] });
+            toast.success('Home added successfully');
+            reset();
+            setIsModalOpen(false);
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.message || 'Failed to add home');
+        },
     });
 
     const deleteMutation = useMutation({
@@ -39,6 +74,21 @@ const Homes = () => {
         }
     };
 
+    const onSubmit = (data) => {
+        // Transform to backend expected format
+        const payload = {
+            name: data.name,
+            zipCode: data.zipCode,
+            address: {
+                street: data.street,
+                city: data.city,
+                state: data.state,
+            },
+            electricityRate: data.electricityRate || 0.12,
+        };
+        createMutation.mutate(payload);
+    };
+
     if (isLoading) {
         return (
             <DashboardLayout title="Homes">
@@ -49,7 +99,7 @@ const Homes = () => {
         );
     }
 
-    const homes = data?.data || [];
+    const homes = data?.homes || [];
 
     return (
         <DashboardLayout title="Homes">
@@ -58,7 +108,7 @@ const Homes = () => {
                 <div className="flex justify-between items-center">
                     <div>
                         <h2 className="text-lg font-semibold text-gray-900">Your Homes</h2>
-                        <p className="text-sm text-gray-600">Manage your registered properties</p>
+                        <p className="text-sm text-gray-600">Manage your registered properties ({homes.length})</p>
                     </div>
                     <Button onClick={() => setIsModalOpen(true)}>
                         <Plus className="h-4 w-4 mr-2" />
@@ -162,13 +212,89 @@ const Homes = () => {
                 )}
             </div>
 
-            {/* Add Home Modal - Placeholder */}
+            {/* Add Home Modal */}
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 title="Add New Home"
             >
-                <p className="text-gray-600">Home creation form will be implemented here.</p>
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    {/* Home Name */}
+                    <Input
+                        label="Home Name"
+                        type="text"
+                        placeholder="e.g., My House, Apartment"
+                        error={errors.name?.message}
+                        {...register('name')}
+                    />
+
+                    {/* Address */}
+                    <Input
+                        label="Street Address"
+                        type="text"
+                        placeholder="e.g., 123 Main Street"
+                        error={errors.street?.message}
+                        {...register('street')}
+                    />
+
+                    {/* City */}
+                    <Input
+                        label="City"
+                        type="text"
+                        placeholder="e.g., New York"
+                        error={errors.city?.message}
+                        {...register('city')}
+                    />
+
+                    {/* State */}
+                    <Input
+                        label="State"
+                        type="text"
+                        placeholder="e.g., NY"
+                        error={errors.state?.message}
+                        {...register('state')}
+                    />
+
+                    {/* ZIP Code */}
+                    <Input
+                        label="ZIP Code"
+                        type="text"
+                        placeholder="e.g., 10001"
+                        error={errors.zipCode?.message}
+                        {...register('zipCode')}
+                    />
+
+                    {/* Electricity Rate */}
+                    <Input
+                        label="Electricity Rate ($/kWh)"
+                        type="number"
+                        step="0.01"
+                        placeholder="e.g., 0.12"
+                        error={errors.electricityRate?.message}
+                        {...register('electricityRate')}
+                    />
+
+                    {/* Actions */}
+                    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                                setIsModalOpen(false);
+                                reset();
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="primary"
+                            isLoading={createMutation.isPending}
+                        >
+                            Add Home
+                        </Button>
+                    </div>
+                </form>
             </Modal>
         </DashboardLayout>
     );

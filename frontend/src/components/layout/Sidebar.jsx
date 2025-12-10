@@ -6,19 +6,27 @@ import {
     Lightbulb,
     Bell,
     FileText,
+    Settings,
     User,
     Menu,
     X,
-    LogOut
+    LogOut,
+    BarChart3,
+    Zap,
+    ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../common/Button';
 
 const Sidebar = () => {
     const [isOpen, setIsOpen] = useState(false);
+    const [showAdminMenu, setShowAdminMenu] = useState(false);
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+
+    // Check if user is admin (you may need to adjust based on your user model)
+    const isAdmin = user?.role === 'admin';
 
     const menuItems = [
         { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -26,6 +34,12 @@ const Sidebar = () => {
         { name: 'Devices', icon: Lightbulb, path: '/devices' },
         { name: 'Alerts', icon: Bell, path: '/alerts' },
         { name: 'Reports', icon: FileText, path: '/reports' },
+        { name: 'Settings', icon: Settings, path: '/settings' },
+    ];
+
+    const adminMenuItems = [
+        { name: 'Device Templates', icon: Zap, path: '/admin/device-templates' },
+        { name: 'Analytics', icon: BarChart3, path: '/admin/analytics' },
     ];
 
     const handleLogout = async () => {
@@ -93,6 +107,46 @@ const Sidebar = () => {
                                     </li>
                                 );
                             })}
+
+                            {/* Admin Section */}
+                            {isAdmin && (
+                                <>
+                                    <li className="pt-4 mt-4 border-t border-gray-200">
+                                        <button
+                                            onClick={() => setShowAdminMenu(!showAdminMenu)}
+                                            className="w-full flex items-center justify-between px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+                                        >
+                                            <span className="text-xs font-semibold text-gray-600 uppercase">Admin</span>
+                                            <ChevronDown
+                                                className={`h-4 w-4 transition-transform ${showAdminMenu ? 'rotate-180' : ''}`}
+                                            />
+                                        </button>
+                                    </li>
+
+                                    {showAdminMenu && adminMenuItems.map((item) => {
+                                        const Icon = item.icon;
+                                        const active = isActive(item.path);
+                                        return (
+                                            <li key={item.path}>
+                                                <Link
+                                                    to={item.path}
+                                                    onClick={() => setIsOpen(false)}
+                                                    className={`
+                            flex items-center space-x-3 px-4 py-3 ml-2 rounded-lg transition-colors text-sm
+                            ${active
+                                                            ? 'bg-blue-50 text-blue-600 font-medium'
+                                                            : 'text-gray-600 hover:bg-gray-100'
+                                                        }
+                          `}
+                                                >
+                                                    <Icon className="h-4 w-4" />
+                                                    <span>{item.name}</span>
+                                                </Link>
+                                            </li>
+                                        );
+                                    })}
+                                </>
+                            )}
                         </ul>
                     </nav>
 
