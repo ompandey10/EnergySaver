@@ -21,11 +21,17 @@ const {
 // All routes require authentication
 router.use(protect);
 
+// Specific routes MUST come before parameterized routes
+router.get('/user', getUserAlerts);
+
+// Triggered alerts (must come before /:id routes)
+router.get('/triggered', validatePagination, getTriggeredAlerts);
+router.put('/triggered/:id/read', validateMongoId('id'), markTriggeredAlertRead);
+router.put('/triggered/:id/resolve', validateMongoId('id'), markTriggeredAlertResolved);
+
 // Alert CRUD routes
 router.route('/')
     .post(validateAlert, createAlert);
-
-router.get('/user', getUserAlerts);
 
 router.route('/:id')
     .get(validateMongoId('id'), getAlert)
@@ -34,10 +40,5 @@ router.route('/:id')
 
 // Test alert
 router.post('/:id/test', validateMongoId('id'), testAlert);
-
-// Triggered alerts
-router.get('/triggered', validatePagination, getTriggeredAlerts);
-router.put('/triggered/:id/read', validateMongoId('id'), markTriggeredAlertRead);
-router.put('/triggered/:id/resolve', validateMongoId('id'), markTriggeredAlertResolved);
 
 module.exports = router;
