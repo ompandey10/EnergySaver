@@ -1,0 +1,10 @@
+// Example User Model - Replace with your actual model
+const mongoose = require('mongoose');
+
+const userSchema = new mongoose.Schema({
+    // Add your schema fields here
+}, {
+    timestamps: true,
+});
+
+module.exports = mongoose.model('User', userSchema);
