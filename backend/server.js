@@ -78,53 +78,83 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// API Routes (to be added)
-// app.use('/api/auth', require('./routes/auth'));
-// app.use('/api/users', require('./routes/users'));
+// Import middleware
+const { notFound, errorHandler } = require('./middleware');
+
+// API Routes
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/homes', require('./routes/homeRoutes'));
+app.use('/api/devices', require('./routes/deviceRoutes'));
+app.use('/api/readings', require('./routes/readingRoutes'));
+app.use('/api/alerts', require('./routes/alertRoutes'));
+app.use('/api/reports', require('./routes/reportRoutes'));
+app.use('/api/admin', require('./routes/adminRoutes'));
 
 // ===================
 // Error Handling
 // ===================
 
 // 404 Handler
-app.use((req, res, next) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found',
-    path: req.originalUrl,
-  });
-});
+app.use(notFound);
 
 // Global Error Handler
-app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  
-  const statusCode = err.statusCode || 500;
-  const message = process.env.NODE_ENV === 'production' 
-    ? 'Internal Server Error' 
-    : err.message;
-
-  res.status(statusCode).json({
-    success: false,
-    message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-  });
-});
+app.use(errorHandler);
 
 // ===================
 // Server Startup
 // ===================
 const PORT = process.env.PORT || 5000;
 
+// Import alert checker for cron jobs
+const { startAlertChecker } = require('./utils/alertChecker');
+
 const startServer = async () => {
-  // Connect to database
-  await connectDB();
-  
-  // Start listening
-  app.listen(PORT, () => {
-    console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-    console.log(`Health check: http://localhost:${PORT}/api/health`);
-  });
+  try {
+    // Connect to database
+    await connectDB();
+
+    // Start cron jobs
+    if (process.env.NODE_ENV !== 'test') {
+      // Check alerts every hour (0 * * * *)
+      startAlertChecker('0 * * * *');
+      console.log('Alert checker cron job started');
+    }
+
+    // Start listening
+    const server = app.listen(PORT, () => {
+      console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+      console.log(`Health check: http://localhost:${PORT}/api/health`);
+    });
+
+    // Handle server errors
+    server.on('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`\n❌ Error: Port ${PORT} is already in use.`);
+        console.error(`\nTo fix this, run one of these commands:`);
+        console.error(`  1. Kill the process: lsof -ti:${PORT} | xargs kill -9`);
+        console.error(`  2. Use a different port: PORT=5001 npm run dev\n`);
+        process.exit(1);
+      } else {
+        console.error('Server error:', error);
+        process.exit(1);
+      }
+    });
+
+    // Graceful shutdown
+    process.on('SIGINT', async () => {
+      console.log('\nShutting down gracefully...');
+      server.close(async () => {
+        console.log('Server closed');
+        await mongoose.connection.close();
+        console.log('MongoDB connection closed');
+        process.exit(0);
+      });
+    });
+
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
 };
 
 startServer();

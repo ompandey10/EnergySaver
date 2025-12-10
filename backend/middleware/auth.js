@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 // Protect routes - Authentication middleware
 const protect = async (req, res, next) => {
@@ -15,26 +16,57 @@ const protect = async (req, res, next) => {
             // Verify token
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-            // Add user to request (you'll need to import your User model)
-            // req.user = await User.findById(decoded.id).select('-password');
+            // Get user from token
+            req.user = await User.findById(decoded.id).select('-password');
 
-            req.user = decoded;
+            if (!req.user) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'User not found',
+                });
+            }
+
+            if (!req.user.isActive) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'User account is deactivated',
+                });
+            }
+
             next();
         } catch (error) {
             console.error('Auth middleware error:', error);
-            res.status(401).json({
+            return res.status(401).json({
                 success: false,
                 message: 'Not authorized, token failed',
             });
         }
-    }
-
-    if (!token) {
-        res.status(401).json({
+    } else {
+        return res.status(401).json({
             success: false,
-            message: 'Not authorized, no token',
+            message: 'Not authorized, no token provided',
         });
     }
 };
 
-module.exports = { protect };
+// Optional auth - doesn't fail if no token, but attaches user if present
+const optionalAuth = async (req, res, next) => {
+    let token;
+
+    if (
+        req.headers.authorization &&
+        req.headers.authorization.startsWith('Bearer')
+    ) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            req.user = await User.findById(decoded.id).select('-password');
+        } catch (error) {
+            // Token invalid, but we continue without user
+            req.user = null;
+        }
+    }
+    next();
+};
+
+module.exports = { protect, optionalAuth };
