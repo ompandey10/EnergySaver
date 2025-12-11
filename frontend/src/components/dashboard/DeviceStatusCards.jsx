@@ -155,13 +155,13 @@ const DeviceStatusCard = ({ device, onEdit, onDelete, onToggle, isHovered, setHo
                                 <div>
                                     <div className="text-xs text-orange-600 font-medium">Cost</div>
                                     <div className="text-lg font-bold text-orange-600">
-                                        ${consumption?.sessionCost?.toFixed(4) || '0.0000'}
+                                        ₹{consumption?.sessionCost?.toFixed(4) || '0.0000'}
                                     </div>
                                 </div>
                             </div>
                             {/* Rate info */}
                             <div className="mt-2 pt-2 border-t border-green-200 text-xs text-gray-500 text-center">
-                                Rate: ${consumption?.electricityRate?.toFixed(2) || '0.12'}/kWh
+                                Rate: ₹{consumption?.electricityRate?.toFixed(2) || '8'}/kWh
                             </div>
                         </div>
                     )}

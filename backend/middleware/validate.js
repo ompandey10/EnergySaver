@@ -52,8 +52,8 @@ const validateHome = [
         .isLength({ max: 100 }).withMessage('Name cannot exceed 100 characters'),
     body('zipCode')
         .trim()
-        .notEmpty().withMessage('Zip code is required')
-        .matches(/^\d{5}(-\d{4})?$/).withMessage('Please provide a valid zip code'),
+        .notEmpty().withMessage('Zip/PIN code is required')
+        .matches(/^(\d{5}(-\d{4})?|\d{6})$/).withMessage('Please provide a valid zip code (5 digits) or PIN code (6 digits)'),
     body('address.street').optional().trim(),
     body('address.city').optional().trim(),
     body('address.state').optional().trim(),
@@ -61,6 +61,9 @@ const validateHome = [
     body('numberOfRooms').optional().isInt({ min: 1 }).withMessage('Number of rooms must be at least 1'),
     body('homeType').optional().isIn(['apartment', 'house', 'condo', 'townhouse', 'other']),
     body('electricityRate').optional().isFloat({ min: 0 }).withMessage('Rate must be a positive number'),
+    body('tariffStructure').optional().isIn(['slab', 'flat', 'tou']).withMessage('Invalid tariff structure'),
+    body('fixedCharges').optional().isFloat({ min: 0 }).withMessage('Fixed charges must be a positive number'),
+    body('tariffSlabs').optional().isArray().withMessage('Tariff slabs must be an array'),
     handleValidationErrors,
 ];
 

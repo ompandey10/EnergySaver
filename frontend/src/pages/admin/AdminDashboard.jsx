@@ -3,7 +3,7 @@ import {
     Users,
     Home,
     Zap,
-    DollarSign,
+    IndianRupee,
     TrendingUp,
     TrendingDown,
     Activity,
@@ -161,12 +161,12 @@ const AdminDashboard = () => {
                                 </p>
                             </div>
                             <div className="p-4 bg-green-50 rounded-lg">
-                                <DollarSign className="h-8 w-8 text-green-600" />
+                                <IndianRupee className="h-8 w-8 text-green-600" />
                             </div>
                         </div>
                         <div className="flex items-center text-sm text-gray-500">
                             <TrendingUp className="h-4 w-4 mr-1" />
-                            Average ${formatNumber((stats.totalCost || 0) / Math.max(stats.totalHomes || 1, 1), 2)}/home
+                            Average ₹{formatNumber((stats.totalCost || 0) / Math.max(stats.totalHomes || 1, 1), 2)}/home
                         </div>
                     </Card>
                 </div>

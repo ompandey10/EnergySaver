@@ -92,7 +92,7 @@ const sampleHomes = [
         squareFootage: 2000,
         numberOfRooms: 4,
         homeType: 'house',
-        electricityRate: 0.12,
+        electricityRate: 8,
     },
     {
         name: 'Downtown Apartment',
@@ -337,14 +337,14 @@ async function clearDatabase() {
 // Seed functions
 async function seedDeviceTemplates() {
     log.section('📋 Seeding Device Templates...');
-    
+
     const existingCount = await DeviceTemplate.countDocuments();
     if (existingCount > 0) {
         log.info(`Found ${existingCount} existing device templates, skipping...`);
         const templates = await DeviceTemplate.find();
         return templates;
     }
-    
+
     const templates = await DeviceTemplate.insertMany(deviceTemplates);
     log.success(`Created ${templates.length} device templates`);
     return templates;
@@ -352,13 +352,13 @@ async function seedDeviceTemplates() {
 
 async function seedUsers() {
     log.section('👥 Seeding Users...');
-    
+
     const existingCount = await User.countDocuments();
     if (existingCount > 0) {
         log.warning(`Found ${existingCount} existing users. Run with --clear to reset data.`);
         throw new Error('Users already exist. Use --clear flag to reset database.');
     }
-    
+
     const users = await User.create(sampleUsers);
     log.success(`Created ${users.length} users`);
     return users;

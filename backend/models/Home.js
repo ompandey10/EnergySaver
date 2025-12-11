@@ -28,14 +28,14 @@ const homeSchema = new mongoose.Schema({
         country: {
             type: String,
             trim: true,
-            default: 'USA',
+            default: 'India',
         },
     },
     zipCode: {
         type: String,
-        required: [true, 'Please provide a zip code'],
+        required: [true, 'Please provide a pin code'],
         trim: true,
-        match: [/^\d{5}(-\d{4})?$/, 'Please provide a valid zip code'],
+        match: [/^\d{5,6}$/, 'Please provide a valid pin code'],
     },
     squareFootage: {
         type: Number,
@@ -51,10 +51,67 @@ const homeSchema = new mongoose.Schema({
         enum: ['apartment', 'house', 'condo', 'townhouse', 'other'],
         default: 'house',
     },
+    // Indian Electricity Tariff Configuration
+    tariffType: {
+        type: String,
+        enum: ['domestic', 'commercial', 'industrial'],
+        default: 'domestic',
+    },
+    // Tariff structure type (slab-based is standard in India)
+    tariffStructure: {
+        type: String,
+        enum: ['slab', 'flat', 'tou'], // slab = slab-based, flat = fixed rate, tou = time-of-use
+        default: 'slab',
+    },
+    // Slab-based tariff rates (Indian system)
+    tariffSlabs: {
+        type: [{
+            minUnits: { type: Number, default: 0 },
+            maxUnits: { type: Number, default: Infinity },
+            rate: { type: Number, required: true }, // ₹ per kWh
+        }],
+        default: [
+            { minUnits: 0, maxUnits: 100, rate: 3.00 },      // 0-100 units: ₹3.00/kWh
+            { minUnits: 101, maxUnits: 300, rate: 5.50 },    // 101-300 units: ₹5.50/kWh
+            { minUnits: 301, maxUnits: 500, rate: 7.00 },    // 301-500 units: ₹7.00/kWh
+            { minUnits: 501, maxUnits: Infinity, rate: 8.50 } // Above 500 units: ₹8.50/kWh
+        ],
+    },
+    // Fixed monthly charges in ₹
+    fixedCharges: {
+        type: Number,
+        default: 50, // ₹50 per month base charge
+        min: [0, 'Fixed charges cannot be negative'],
+    },
+    // Sanctioned load in kW (for fixed charge calculation)
+    sanctionedLoad: {
+        type: Number,
+        default: 5, // 5 kW default
+        min: [0, 'Sanctioned load cannot be negative'],
+    },
+    // Per kW charge
+    perKWCharge: {
+        type: Number,
+        default: 20, // ₹20 per kW per month
+        min: [0, 'Per kW charge cannot be negative'],
+    },
+    // Tax percentage (typically 5-18% GST)
+    taxPercentage: {
+        type: Number,
+        default: 5, // 5% tax
+        min: [0, 'Tax percentage cannot be negative'],
+        max: [100, 'Tax percentage cannot exceed 100'],
+    },
+    // Simple flat rate (fallback if not using slabs)
     electricityRate: {
         type: Number,
-        default: 0.12, // Default rate per kWh in dollars
+        default: 6, // Default rate per kWh in INR (₹)
         min: [0, 'Rate cannot be negative'],
+    },
+    // Whether to use slab-based pricing
+    useSlabPricing: {
+        type: Boolean,
+        default: true,
     },
     isActive: {
         type: Boolean,

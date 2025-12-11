@@ -17,6 +17,10 @@ const createHome = asyncHandler(async (req, res) => {
         numberOfRooms,
         homeType,
         electricityRate,
+        country,
+        tariffStructure,
+        tariffSlabs,
+        fixedCharges,
     } = req.body;
 
     const home = await Home.create({
@@ -28,6 +32,10 @@ const createHome = asyncHandler(async (req, res) => {
         numberOfRooms,
         homeType,
         electricityRate,
+        country,
+        tariffStructure,
+        tariffSlabs,
+        fixedCharges,
     });
 
     res.status(201).json({

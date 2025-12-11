@@ -4,7 +4,7 @@ import {
     Zap,
     Home,
     TrendingUp,
-    DollarSign,
+    IndianRupee,
     Activity,
     AlertTriangle,
     Power,
@@ -101,7 +101,7 @@ const ActiveDeviceCard = ({ device }) => {
                 )}
                 {consumption?.sessionCost > 0 && (
                     <p className="text-xs font-medium text-orange-600 mt-1">
-                        ${consumption.sessionCost.toFixed(4)}
+                        ₹{consumption.sessionCost.toFixed(4)}
                     </p>
                 )}
             </div>
@@ -161,7 +161,9 @@ const Dashboard = () => {
     });
 
     const primaryHomeId = homesData?.homes?.[0]?._id;
-    const electricityRate = homesData?.homes?.[0]?.electricityRate || 0.12;
+    const primaryHome = homesData?.homes?.[0];
+    const tariffStructure = primaryHome?.tariffStructure || 'slab';
+    const electricityRate = primaryHome?.electricityRate || 6;
 
     // Get devices for the primary home
     const { data: devicesData, isLoading: devicesLoading } = useQuery({
@@ -268,13 +270,13 @@ const Dashboard = () => {
                                 </div>
                                 <div className="bg-white/10 rounded-lg p-3 text-center">
                                     <p className="text-xs opacity-75">Total Cost</p>
-                                    <p className="text-xl font-bold text-yellow-200">${totalLiveCost.toFixed(4)}</p>
-                                    <p className="text-xs opacity-75">USD</p>
+                                    <p className="text-xl font-bold text-yellow-200">₹{totalLiveCost.toFixed(4)}</p>
+                                    <p className="text-xs opacity-75">INR</p>
                                 </div>
                                 <div className="bg-white/10 rounded-lg p-3 text-center col-span-2 md:col-span-1">
-                                    <p className="text-xs opacity-75">Rate</p>
-                                    <p className="text-xl font-bold">${electricityRate.toFixed(2)}</p>
-                                    <p className="text-xs opacity-75">per kWh</p>
+                                    <p className="text-xs opacity-75">Tariff</p>
+                                    <p className="text-xl font-bold">{tariffStructure === 'slab' ? 'Slab' : `₹${electricityRate.toFixed(2)}`}</p>
+                                    <p className="text-xs opacity-75">{tariffStructure === 'slab' ? '₹3-8.50/kWh' : 'per kWh'}</p>
                                 </div>
                             </div>
                         </div>
@@ -306,9 +308,9 @@ const Dashboard = () => {
                     />
                     <StatCard
                         title="Live Cost"
-                        value={`$${totalLiveCost.toFixed(4)}`}
-                        icon={DollarSign}
-                        subtitle={`Rate: $${electricityRate.toFixed(2)}/kWh`}
+                        value={`₹${totalLiveCost.toFixed(4)}`}
+                        icon={IndianRupee}
+                        subtitle={tariffStructure === 'slab' ? 'Slab-based pricing' : `Rate: ₹${electricityRate.toFixed(2)}/kWh`}
                         live={activeDevices.length > 0}
                         color="yellow"
                     />

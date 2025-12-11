@@ -22,7 +22,7 @@ const TIP_RULES = {
                 'Check for devices left on unnecessarily',
                 'Review your HVAC settings and usage patterns',
             ],
-            potentialSavings: '$50-100/month',
+            potentialSavings: '₹4,000-8,000/month',
         },
     },
 
@@ -38,13 +38,13 @@ const TIP_RULES = {
             title: 'HVAC System Using Too Much Energy',
             description: 'Your heating/cooling system accounts for over 50% of your energy usage.',
             recommendations: [
-                'Set thermostat to 68°F in winter and 78°F in summer',
+                'Set thermostat to 20°C in winter and 26°C in summer',
                 'Use a programmable thermostat to reduce usage when away',
                 'Replace air filters monthly',
                 'Schedule annual HVAC maintenance',
                 'Seal air leaks around windows and doors',
             ],
-            potentialSavings: '$30-60/month',
+            potentialSavings: '₹2,500-5,000/month',
         },
     },
 
@@ -63,7 +63,7 @@ const TIP_RULES = {
                 'Use ceiling fans to extend comfort periods',
                 'Close blinds during peak heat hours',
             ],
-            potentialSavings: '$20-40/month',
+            potentialSavings: '₹1,600-3,300/month',
         },
     },
 
@@ -79,13 +79,13 @@ const TIP_RULES = {
             title: 'Water Heater Running Constantly',
             description: 'Your water heater is on more than 80% of the time.',
             recommendations: [
-                'Lower water heater temperature to 120°F',
+                'Lower water heater temperature to 50°C',
                 'Install a timer to heat water only when needed',
                 'Consider a tankless water heater for long-term savings',
                 'Check for leaks in hot water pipes',
                 'Insulate your water heater tank',
             ],
-            potentialSavings: '$15-30/month',
+            potentialSavings: '₹1,200-2,500/month',
         },
     },
 
@@ -103,7 +103,7 @@ const TIP_RULES = {
                 'Enable power-saving modes on all devices',
                 'Check for devices that don\'t need to run 24/7',
             ],
-            potentialSavings: '$10-20/month',
+            potentialSavings: '₹800-1,600/month',
         },
     },
 
@@ -121,13 +121,13 @@ const TIP_RULES = {
             title: 'Consider Energy-Efficient Appliances',
             description: 'Major appliances are using significant energy.',
             recommendations: [
-                'Look for ENERGY STAR certified appliances when replacing',
+                'Look for BEE 5-star rated appliances when replacing',
                 'Run dishwasher and washing machine only with full loads',
                 'Use cold water for laundry when possible',
                 'Clean refrigerator coils regularly',
                 'Keep freezer full to maintain efficiency',
             ],
-            potentialSavings: '$20-40/month',
+            potentialSavings: '₹1,600-3,300/month',
         },
     },
 
@@ -149,7 +149,7 @@ const TIP_RULES = {
                 'Use dimmer switches where appropriate',
                 'Turn off lights in unoccupied rooms',
             ],
-            potentialSavings: '$10-25/month',
+            potentialSavings: '₹800-2,000/month',
         },
     },
 
@@ -169,7 +169,7 @@ const TIP_RULES = {
                 'Use your EV\'s scheduled charging feature',
                 'Consider a smart charger with time-of-use optimization',
             ],
-            potentialSavings: '$40-80/month',
+            potentialSavings: '₹3,300-6,600/month',
         },
     },
 
@@ -190,7 +190,7 @@ const TIP_RULES = {
                 'Use a variable speed pump for better efficiency',
                 'Keep filters clean to reduce runtime needed',
             ],
-            potentialSavings: '$25-50/month',
+            potentialSavings: '₹2,000-4,000/month',
         },
     },
 
@@ -209,10 +209,10 @@ const TIP_RULES = {
                 'Use ceiling fans to feel cooler at higher thermostat settings',
                 'Close curtains during the hottest part of the day',
                 'Avoid using heat-generating appliances during the day',
-                'Ensure attic insulation is adequate (R-38 or higher)',
+                'Ensure attic insulation is adequate',
                 'Plant shade trees on south and west sides of home',
             ],
-            potentialSavings: '$30-70/month',
+            potentialSavings: '₹2,500-5,800/month',
         },
     },
 
@@ -227,13 +227,13 @@ const TIP_RULES = {
             title: 'Winter Heating Efficiency',
             description: 'Cold weather is increasing your heating costs.',
             recommendations: [
-                'Lower thermostat to 68°F and use layers/blankets',
+                'Lower thermostat to 20°C and use layers/blankets',
                 'Reverse ceiling fans to circulate warm air downward',
                 'Use door draft stoppers',
                 'Open curtains during sunny days, close at night',
                 'Check attic and wall insulation',
             ],
-            potentialSavings: '$25-60/month',
+            potentialSavings: '₹2,000-5,000/month',
         },
     },
 };
@@ -398,10 +398,17 @@ const calculatePotentialSavings = (tips) => {
 
     tips.forEach(tip => {
         const savingsStr = tip.potentialSavings;
-        const matches = savingsStr.match(/\$(\d+)-(\d+)/);
-        if (matches) {
-            minSavings += parseInt(matches[1]);
-            maxSavings += parseInt(matches[2]);
+        // Match both ₹X,XXX-Y,YYY and $X-Y formats
+        const inrMatches = savingsStr.match(/₹([\d,]+)-([\d,]+)/);
+        const usdMatches = savingsStr.match(/\$(\d+)-(\d+)/);
+
+        if (inrMatches) {
+            minSavings += parseInt(inrMatches[1].replace(/,/g, ''));
+            maxSavings += parseInt(inrMatches[2].replace(/,/g, ''));
+        } else if (usdMatches) {
+            // Convert USD to INR (approx 83x)
+            minSavings += parseInt(usdMatches[1]) * 83;
+            maxSavings += parseInt(usdMatches[2]) * 83;
         }
     });
 
@@ -416,6 +423,7 @@ const calculatePotentialSavings = (tips) => {
             max: maxSavings * 12,
             average: Math.round(((minSavings + maxSavings) / 2) * 12),
         },
+        currency: 'INR',
     };
 };
 

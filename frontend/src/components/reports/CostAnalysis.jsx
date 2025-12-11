@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, TrendingUp, TrendingDown, Calculator, PiggyBank, Calendar, Home } from 'lucide-react';
+import { IndianRupee, TrendingUp, TrendingDown, Calculator, PiggyBank, Calendar, Home } from 'lucide-react';
 import Card from '../common/Card';
 import Badge from '../common/Badge';
 import Spinner from '../common/Spinner';
@@ -113,7 +113,7 @@ const CostAnalysis = () => {
 
                 {!selectedHome ? (
                     <div className="text-center py-12">
-                        <DollarSign className="mx-auto h-12 w-12 text-gray-400" />
+                        <IndianRupee className="mx-auto h-12 w-12 text-gray-400" />
                         <h3 className="mt-2 text-sm font-medium text-gray-900">Select a home</h3>
                         <p className="mt-1 text-sm text-gray-500">
                             Choose a home to view cost analysis.
@@ -129,7 +129,7 @@ const CostAnalysis = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div className="p-4 bg-blue-50 rounded-lg">
                                 <div className="flex items-center justify-between">
-                                    <DollarSign className="h-8 w-8 text-blue-600" />
+                                    <IndianRupee className="h-8 w-8 text-blue-600" />
                                     {analysis.costChange !== undefined && (
                                         <Badge variant={analysis.costChange <= 0 ? 'success' : 'danger'} size="sm">
                                             {analysis.costChange <= 0 ? (

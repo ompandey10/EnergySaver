@@ -302,10 +302,10 @@ const CommunityInsights = () => {
                                 >
                                     <div
                                         className={`w-12 rounded-t ${index === 0 ? 'bg-green-400' :
-                                                index === 1 ? 'bg-green-500' :
-                                                    index === 2 ? 'bg-yellow-500' :
-                                                        index === 3 ? 'bg-orange-500' :
-                                                            'bg-red-500'
+                                            index === 1 ? 'bg-green-500' :
+                                                index === 2 ? 'bg-yellow-500' :
+                                                    index === 3 ? 'bg-orange-500' :
+                                                        'bg-red-500'
                                             }`}
                                         style={{ height: `${(bucket.count / 72) * 80}px` }}
                                     ></div>
@@ -373,10 +373,10 @@ const CommunityInsights = () => {
                     <Card title="Top Efficiency Tips" subtitle="Most impactful recommendations">
                         <div className="space-y-3">
                             {[
-                                { tip: 'Upgrade to LED lighting', savings: '$120/year', adoptionRate: 65 },
-                                { tip: 'Smart thermostat installation', savings: '$180/year', adoptionRate: 42 },
-                                { tip: 'Regular HVAC maintenance', savings: '$150/year', adoptionRate: 38 },
-                                { tip: 'Energy-efficient appliances', savings: '$200/year', adoptionRate: 28 },
+                                { tip: 'Upgrade to LED lighting', savings: '₹10,000/year', adoptionRate: 65 },
+                                { tip: 'Smart thermostat installation', savings: '₹15,000/year', adoptionRate: 42 },
+                                { tip: 'Regular HVAC maintenance', savings: '₹12,500/year', adoptionRate: 38 },
+                                { tip: 'Energy-efficient appliances', savings: '₹16,500/year', adoptionRate: 28 },
                             ].map((item, index) => (
                                 <div
                                     key={index}

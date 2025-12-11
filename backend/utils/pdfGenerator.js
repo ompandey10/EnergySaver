@@ -177,7 +177,7 @@ const addExecutiveSummary = (doc, costData, comparisonData) => {
     doc
         .fontSize(28)
         .fillColor('#2563eb')
-        .text(`$${totalCost.toFixed(2)}`, 60, boxY + 40);
+        .text(`₹${totalCost.toFixed(2)}`, 60, boxY + 40);
 
     doc
         .fontSize(10)
@@ -199,7 +199,7 @@ const addExecutiveSummary = (doc, costData, comparisonData) => {
     doc
         .fontSize(20)
         .fillColor('#f59e0b')
-        .text(`$${avgDailyCost.toFixed(2)}`, 320, boxY + 45);
+        .text(`₹${avgDailyCost.toFixed(2)}`, 320, boxY + 45);
 
     doc
         .fontSize(10)
@@ -304,7 +304,7 @@ const addUsageBreakdown = (doc, costData) => {
             xPos += colWidths[0];
             doc.text(data.totalKWh.toFixed(2), xPos, yPos, { width: colWidths[1] });
             xPos += colWidths[1];
-            doc.text(`$${data.totalCost.toFixed(2)}`, xPos, yPos, { width: colWidths[2] });
+            doc.text(`₹${data.totalCost.toFixed(2)}`, xPos, yPos, { width: colWidths[2] });
             xPos += colWidths[2];
             doc.text(`${data.percentage.toFixed(1)}%`, xPos, yPos, { width: colWidths[3] });
 
@@ -364,7 +364,7 @@ const addDeviceAnalysis = (doc, deviceBreakdown, devices) => {
             .fillColor('#6b7280')
             .text(`Type: ${deviceType}`)
             .text(`Usage: ${totalKWh.toFixed(2)} kWh (${percentage.toFixed(1)}%)`)
-            .text(`Cost: $${totalCost.toFixed(2)}`)
+            .text(`Cost: ₹${totalCost.toFixed(2)}`)
             .moveDown(0.5);
 
         // Draw bar
@@ -413,7 +413,7 @@ const addDailyTrends = (doc, dailyBreakdown) => {
     const lowUsageDays = breakdown.filter(d => (d.totalCost || 0) < avgCost * 0.8);
 
     doc
-        .text(`Average daily cost: $${avgCost.toFixed(2)}`)
+        .text(`Average daily cost: ₹${avgCost.toFixed(2)}`)
         .text(`High usage days: ${highUsageDays.length}`)
         .text(`Low usage days: ${lowUsageDays.length}`)
         .moveDown(1);
@@ -427,7 +427,7 @@ const addDailyTrends = (doc, dailyBreakdown) => {
             .fontSize(10);
 
         highUsageDays.slice(0, 3).forEach(day => {
-            doc.text(`  • ${day.date}: $${(day.totalCost || 0).toFixed(2)} (${(day.totalKWh || 0).toFixed(2)} kWh)`);
+            doc.text(`  • ${day.date}: ₹${(day.totalCost || 0).toFixed(2)} (${(day.totalKWh || 0).toFixed(2)} kWh)`);
         });
     }
 
@@ -479,7 +479,7 @@ const addNeighborhoodComparison = (doc, comparisonData) => {
         .fontSize(10)
         .fillColor('#6b7280')
         .font('Helvetica')
-        .text(`$${comparisonData.home.totalCost.toFixed(2)}`, 60, boxY + 60);
+        .text(`₹${comparisonData.home.totalCost.toFixed(2)}`, 60, boxY + 60);
 
     // Neighborhood average box
     doc
@@ -501,7 +501,7 @@ const addNeighborhoodComparison = (doc, comparisonData) => {
         .fontSize(10)
         .fillColor('#9ca3af')
         .font('Helvetica')
-        .text(`$${comparisonData.neighborhood.avgCost.toFixed(2)}`, 320, boxY + 60);
+        .text(`₹${comparisonData.neighborhood.avgCost.toFixed(2)}`, 320, boxY + 60);
 
     doc.y = boxY + 100;
     doc.moveDown(1);
@@ -524,7 +524,7 @@ const addSavingsTips = (doc, tips, savings) => {
         .fontSize(12)
         .font('Helvetica')
         .fillColor('#374151')
-        .text(`Potential Monthly Savings: $${savings.monthly.min}-${savings.monthly.max}`)
+        .text(`Potential Monthly Savings: ₹${savings.monthly.min}-${savings.monthly.max}`)
         .moveDown(1);
 
     tips.forEach((tip, index) => {

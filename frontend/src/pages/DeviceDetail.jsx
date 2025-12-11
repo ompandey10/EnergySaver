@@ -178,7 +178,7 @@ const DeviceDetail = () => {
                                         </div>
                                         <div>
                                             <p className="opacity-75">Session Cost</p>
-                                            <p className="font-bold text-yellow-200 text-lg">${consumption.sessionCost?.toFixed(4) || '0'}</p>
+                                            <p className="font-bold text-yellow-200 text-lg">₹{consumption.sessionCost?.toFixed(4) || '0'}</p>
                                         </div>
                                         <div>
                                             <p className="opacity-75">Duration</p>
@@ -186,7 +186,7 @@ const DeviceDetail = () => {
                                         </div>
                                         <div>
                                             <p className="opacity-75">Rate</p>
-                                            <p className="font-semibold">${consumption.electricityRate?.toFixed(2) || '0.12'}/kWh</p>
+                                            <p className="font-semibold">₹{consumption.electricityRate?.toFixed(2) || '8'}/kWh</p>
                                         </div>
                                     </div>
                                 )}
@@ -386,7 +386,7 @@ const DeviceDetail = () => {
                                 </li>
                                 <li className="flex items-start space-x-2">
                                     <span className="text-blue-600">•</span>
-                                    <span>Potential savings: $5-10/month</span>
+                                    <span>Potential savings: ₹400-800/month</span>
                                 </li>
                             </ul>
                         </div>

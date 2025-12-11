@@ -354,7 +354,7 @@ const toggleDevice = asyncHandler(async (req, res) => {
         if (device.lastTurnedOn) {
             const sessionDuration = (new Date() - device.lastTurnedOn) / (1000 * 60 * 60); // hours
             const sessionKWh = (device.wattage * sessionDuration) / 1000;
-            const electricityRate = device.home.electricityRate || 0.12;
+            const electricityRate = device.home.electricityRate || 8;
             const sessionCost = sessionKWh * electricityRate;
 
             // Create a reading for this session
@@ -396,7 +396,7 @@ const toggleDevice = asyncHandler(async (req, res) => {
  * @access  Private
  */
 const getCurrentConsumption = asyncHandler(async (req, res) => {
-    const device = await Device.findById(req.params.id).populate('home', 'user electricityRate');
+    const device = await Device.findById(req.params.id).populate('home', 'user electricityRate tariffSlabs tariffStructure fixedCharges');
 
     if (!device) {
         return res.status(404).json({
@@ -434,8 +434,28 @@ const getCurrentConsumption = asyncHandler(async (req, res) => {
     const sessionStart = device.lastTurnedOn || new Date();
     const sessionDuration = (new Date() - sessionStart) / (1000 * 60 * 60); // hours
     const sessionKWh = (device.wattage * sessionDuration) / 1000;
-    const electricityRate = device.home.electricityRate || 0.12;
-    const sessionCost = sessionKWh * electricityRate;
+
+    // Use slab-based pricing if available, otherwise use flat rate
+    const { calculateSimpleSlabCost, DEFAULT_TARIFF_SLABS } = require('../utils/costCalculator');
+    const tariffSlabs = device.home.tariffSlabs && device.home.tariffSlabs.length > 0
+        ? device.home.tariffSlabs
+        : DEFAULT_TARIFF_SLABS;
+    const tariffStructure = device.home.tariffStructure || 'slab';
+
+    let sessionCost;
+    let effectiveRate;
+
+    if (tariffStructure === 'slab') {
+        // Calculate using slab-based pricing
+        const slabResult = calculateSimpleSlabCost(sessionKWh, tariffSlabs);
+        sessionCost = slabResult.totalCost;
+        effectiveRate = slabResult.effectiveRate;
+    } else {
+        // Use flat rate
+        const electricityRate = device.home.electricityRate || 6;
+        sessionCost = sessionKWh * electricityRate;
+        effectiveRate = electricityRate;
+    }
 
     res.status(200).json({
         success: true,
@@ -452,7 +472,8 @@ const getCurrentConsumption = asyncHandler(async (req, res) => {
             sessionCost: parseFloat(sessionCost.toFixed(4)),
             sessionDuration: parseFloat((sessionDuration * 60).toFixed(2)), // minutes
             sessionStart: sessionStart,
-            electricityRate: electricityRate,
+            electricityRate: parseFloat(effectiveRate.toFixed(2)),
+            tariffStructure: tariffStructure,
         },
     });
 });

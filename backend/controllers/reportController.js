@@ -17,6 +17,8 @@ const {
     calculatePeriodCost,
     calculateMonthlyProjection,
     comparePeriodCosts,
+    calculateSimpleSlabCost,
+    DEFAULT_TARIFF_SLABS,
 } = require('../utils/costCalculator');
 
 /**
@@ -505,11 +507,25 @@ const getConsumptionReport = asyncHandler(async (req, res) => {
         let liveTotalWatts = 0;
         const liveDevices = [];
 
+        // Get tariff settings from home
+        const tariffSlabs = home.tariffSlabs && home.tariffSlabs.length > 0
+            ? home.tariffSlabs
+            : DEFAULT_TARIFF_SLABS;
+        const tariffStructure = home.tariffStructure || 'slab';
+
         for (const device of activeDevices) {
             const sessionStart = device.lastTurnedOn;
             const sessionDuration = (now - sessionStart) / (1000 * 60 * 60); // hours
             const sessionKWh = (device.wattage * sessionDuration) / 1000;
-            const sessionCost = sessionKWh * (home.electricityRate || 0.12);
+
+            // Calculate cost based on tariff structure
+            let sessionCost;
+            if (tariffStructure === 'slab') {
+                const slabResult = calculateSimpleSlabCost(sessionKWh, tariffSlabs);
+                sessionCost = slabResult.totalCost;
+            } else {
+                sessionCost = sessionKWh * (home.electricityRate || 6);
+            }
 
             liveTotalKWh += sessionKWh;
             liveTotalCost += sessionCost;
@@ -589,7 +605,9 @@ const getConsumptionReport = asyncHandler(async (req, res) => {
             home: {
                 _id: home._id,
                 name: home.name,
-                electricityRate: home.electricityRate || 0.12,
+                electricityRate: home.electricityRate || 6,
+                tariffStructure: home.tariffStructure || 'slab',
+                tariffSlabs: home.tariffSlabs && home.tariffSlabs.length > 0 ? home.tariffSlabs : DEFAULT_TARIFF_SLABS,
             },
             period: {
                 start: start.toISOString(),

@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, DollarSign, Zap, Lightbulb, Home, Activity, Clock } from 'lucide-react';
+import { TrendingUp, TrendingDown, IndianRupee, Zap, Lightbulb, Home, Activity, Clock } from 'lucide-react';
 import Card from '../common/Card';
 import Badge from '../common/Badge';
 import { formatCurrency, formatEnergy, formatNumber } from '../../utils/helpers';
@@ -111,8 +111,8 @@ const ReportPreview = ({ reportData }) => {
                             </div>
                             <div className="bg-white/10 rounded-lg p-3 text-center">
                                 <p className="text-xs opacity-75">Live Cost</p>
-                                <p className="text-xl font-bold text-yellow-200">${liveConsumption.totalCost?.toFixed(4) || '0'}</p>
-                                <p className="text-xs opacity-75">USD</p>
+                                <p className="text-xl font-bold text-yellow-200">₹{liveConsumption.totalCost?.toFixed(4) || '0'}</p>
+                                <p className="text-xs opacity-75">INR</p>
                             </div>
                         </div>
                     </div>
@@ -134,7 +134,7 @@ const ReportPreview = ({ reportData }) => {
                                         </div>
                                         <div className="flex justify-between text-xs mt-1">
                                             <span>{device.sessionKWh?.toFixed(4) || '0'} kWh</span>
-                                            <span className="text-yellow-200">${device.sessionCost?.toFixed(4) || '0'}</span>
+                                            <span className="text-yellow-200">₹{device.sessionCost?.toFixed(4) || '0'}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -167,7 +167,7 @@ const ReportPreview = ({ reportData }) => {
                 <Card>
                     <div className="flex items-center space-x-3">
                         <div className="p-3 bg-green-100 rounded-full">
-                            <DollarSign className="h-6 w-6 text-green-600" />
+                            <IndianRupee className="h-6 w-6 text-green-600" />
                         </div>
                         <div>
                             <p className="text-sm text-gray-600">Total Cost</p>
@@ -176,7 +176,7 @@ const ReportPreview = ({ reportData }) => {
                             </p>
                             {isCurrentMonth && liveConsumption && (
                                 <p className="text-xs text-green-600">
-                                    Includes ${liveConsumption.totalCost?.toFixed(4) || 0} live
+                                    Includes ₹{liveConsumption.totalCost?.toFixed(4) || 0} live
                                 </p>
                             )}
                         </div>
@@ -267,7 +267,7 @@ const ReportPreview = ({ reportData }) => {
                                             Cost: {formatCurrency(device.totalCost)}
                                             {hasLiveData && (
                                                 <span className="text-green-600 ml-1">
-                                                    (+${device.liveCost?.toFixed(4)} live)
+                                                    (+₹{device.liveCost?.toFixed(4)} live)
                                                 </span>
                                             )}
                                         </div>

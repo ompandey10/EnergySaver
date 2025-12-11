@@ -3,18 +3,191 @@ const Home = require('../models/Home');
 const Device = require('../models/Device');
 
 /**
- * Cost Calculator - Calculate electricity costs based on readings and rates
- * Handles various pricing structures and provides detailed cost breakdowns
+ * Cost Calculator - Calculate electricity costs based on Indian tariff system
+ * Supports slab-based pricing, fixed charges, and taxes
  */
 
+// Default Indian tariff slabs (can be overridden per home)
+const DEFAULT_TARIFF_SLABS = [
+    { minUnits: 0, maxUnits: 100, rate: 3.00 },      // 0-100 units: ₹3.00/kWh
+    { minUnits: 101, maxUnits: 300, rate: 5.50 },    // 101-300 units: ₹5.50/kWh
+    { minUnits: 301, maxUnits: 500, rate: 7.00 },    // 301-500 units: ₹7.00/kWh
+    { minUnits: 501, maxUnits: Infinity, rate: 8.50 } // Above 500 units: ₹8.50/kWh
+];
+
 /**
- * Calculate cost for a single reading
+ * Calculate cost using Indian slab-based tariff
+ * @param {Number} totalKWh - Total energy consumption in kWh (units)
+ * @param {Array} slabs - Array of slab objects with {minUnits, maxUnits, rate}
+ * @returns {Object} Cost breakdown by slab
+ */
+const calculateSlabCost = (totalKWh, slabs = DEFAULT_TARIFF_SLABS) => {
+    let totalCost = 0;
+    let remainingUnits = totalKWh;
+    const slabBreakdown = [];
+
+    // Sort slabs by minUnits
+    const sortedSlabs = [...slabs].sort((a, b) => a.minUnits - b.minUnits);
+
+    for (const slab of sortedSlabs) {
+        if (remainingUnits <= 0) break;
+
+        const slabMin = slab.minUnits;
+        const slabMax = slab.maxUnits || Infinity;
+        const slabRange = slabMax - slabMin + 1;
+
+        // Calculate units in this slab
+        let unitsInSlab = 0;
+        if (totalKWh > slabMin) {
+            unitsInSlab = Math.min(remainingUnits, slabRange);
+            if (totalKWh <= slabMax) {
+                unitsInSlab = totalKWh - slabMin;
+                if (slabMin === 0) unitsInSlab = Math.min(totalKWh, slabMax);
+            }
+        }
+
+        // Recalculate for first slab
+        if (slabMin === 0) {
+            unitsInSlab = Math.min(totalKWh, slabMax);
+        } else if (totalKWh > slabMin) {
+            const prevMax = sortedSlabs[sortedSlabs.indexOf(slab) - 1]?.maxUnits || 0;
+            unitsInSlab = Math.min(totalKWh - prevMax, slabMax - slabMin);
+        } else {
+            unitsInSlab = 0;
+        }
+
+        if (unitsInSlab > 0) {
+            const slabCost = unitsInSlab * slab.rate;
+            totalCost += slabCost;
+            slabBreakdown.push({
+                slab: `${slabMin}-${slabMax === Infinity ? '∞' : slabMax} units`,
+                units: parseFloat(unitsInSlab.toFixed(4)),
+                rate: slab.rate,
+                cost: parseFloat(slabCost.toFixed(2)),
+            });
+        }
+    }
+
+    return {
+        totalCost: parseFloat(totalCost.toFixed(2)),
+        slabBreakdown,
+    };
+};
+
+/**
+ * Calculate simple slab cost (simplified version)
+ * @param {Number} units - Total units consumed
+ * @param {Array} slabs - Tariff slabs
+ * @returns {Object} Total cost and effective rate
+ */
+const calculateSimpleSlabCost = (units, slabs = DEFAULT_TARIFF_SLABS) => {
+    if (units <= 0) {
+        return { totalCost: 0, effectiveRate: slabs[0]?.rate || 3 };
+    }
+
+    let cost = 0;
+    let remaining = units;
+
+    const sortedSlabs = [...slabs].sort((a, b) => (a.minUnits || 0) - (b.minUnits || 0));
+
+    for (let i = 0; i < sortedSlabs.length && remaining > 0; i++) {
+        const slab = sortedSlabs[i];
+        const slabLimit = slab.limit || slab.maxUnits || (sortedSlabs[i + 1]?.minUnits - 1) || Infinity;
+        const slabMin = slab.minUnits || (i === 0 ? 0 : sortedSlabs[i - 1]?.limit || sortedSlabs[i - 1]?.maxUnits || 0);
+        const slabRange = slabLimit === Infinity ? remaining : (slabLimit - slabMin);
+        const unitsInSlab = Math.min(remaining, slabRange);
+
+        cost += unitsInSlab * slab.rate;
+        remaining -= unitsInSlab;
+    }
+
+    const totalCost = parseFloat(cost.toFixed(2));
+    const effectiveRate = units > 0 ? parseFloat((totalCost / units).toFixed(2)) : slabs[0]?.rate || 3;
+
+    return { totalCost, effectiveRate };
+};
+
+/**
+ * Calculate complete monthly bill (Indian format)
+ * @param {Number} totalKWh - Total energy consumption in kWh
+ * @param {Object} home - Home document with tariff configuration
+ * @returns {Object} Complete bill breakdown
+ */
+const calculateMonthlyBill = (totalKWh, home) => {
+    const slabs = home.tariffSlabs || DEFAULT_TARIFF_SLABS;
+    const useSlabs = home.useSlabPricing !== false;
+
+    // Energy charges
+    let energyCharges;
+    let slabBreakdown = [];
+
+    if (useSlabs) {
+        const slabResult = calculateSlabCost(totalKWh, slabs);
+        energyCharges = slabResult.totalCost;
+        slabBreakdown = slabResult.slabBreakdown;
+    } else {
+        energyCharges = totalKWh * (home.electricityRate || 6);
+    }
+
+    // Fixed charges
+    const fixedCharges = home.fixedCharges || 50;
+    const loadCharges = (home.sanctionedLoad || 5) * (home.perKWCharge || 20);
+    const totalFixedCharges = fixedCharges + loadCharges;
+
+    // Subtotal before tax
+    const subtotal = energyCharges + totalFixedCharges;
+
+    // Tax calculation
+    const taxPercentage = home.taxPercentage || 5;
+    const taxAmount = (subtotal * taxPercentage) / 100;
+
+    // Total bill
+    const totalBill = subtotal + taxAmount;
+
+    // Calculate effective rate (average cost per unit)
+    const effectiveRate = totalKWh > 0 ? totalBill / totalKWh : 0;
+
+    return {
+        unitsConsumed: parseFloat(totalKWh.toFixed(4)),
+        energyCharges: parseFloat(energyCharges.toFixed(2)),
+        slabBreakdown,
+        fixedCharges: parseFloat(totalFixedCharges.toFixed(2)),
+        fixedChargesBreakdown: {
+            baseCharge: fixedCharges,
+            loadCharge: loadCharges,
+            sanctionedLoad: home.sanctionedLoad || 5,
+            perKWCharge: home.perKWCharge || 20,
+        },
+        subtotal: parseFloat(subtotal.toFixed(2)),
+        taxPercentage,
+        taxAmount: parseFloat(taxAmount.toFixed(2)),
+        totalBill: parseFloat(totalBill.toFixed(2)),
+        effectiveRate: parseFloat(effectiveRate.toFixed(2)),
+        currency: 'INR',
+        currencySymbol: '₹',
+    };
+};
+
+/**
+ * Calculate cost for a single reading (using effective rate or slab)
  * @param {Number} kWh - Energy consumption in kWh
- * @param {Number} rate - Rate per kWh in dollars
- * @returns {Number} Cost in dollars
+ * @param {Number} rate - Rate per kWh in INR
+ * @returns {Number} Cost in INR
  */
 const calculateReadingCost = (kWh, rate) => {
     return parseFloat((kWh * rate).toFixed(4));
+};
+
+/**
+ * Get effective rate for a given consumption level
+ * @param {Number} totalKWh - Monthly consumption
+ * @param {Array} slabs - Tariff slabs
+ * @returns {Number} Effective rate per kWh
+ */
+const getEffectiveRate = (totalKWh, slabs = DEFAULT_TARIFF_SLABS) => {
+    if (totalKWh <= 0) return slabs[0]?.rate || 6;
+    const cost = calculateSimpleSlabCost(totalKWh, slabs);
+    return parseFloat((cost / totalKWh).toFixed(2));
 };
 
 /**
@@ -22,7 +195,7 @@ const calculateReadingCost = (kWh, rate) => {
  * @param {Number} kWh - Energy consumption in kWh
  * @param {Date} timestamp - Timestamp of reading
  * @param {Object} rateStructure - TOU rate structure
- * @returns {Number} Cost in dollars
+ * @returns {Number} Cost in INR
  */
 const calculateTOUCost = (kWh, timestamp, rateStructure) => {
     const hour = timestamp.getHours();
@@ -55,10 +228,10 @@ const calculateTOUCost = (kWh, timestamp, rateStructure) => {
 };
 
 /**
- * Calculate cost with tiered pricing
+ * Calculate cost with tiered pricing (legacy support)
  * @param {Number} totalKWh - Total energy consumption in kWh
  * @param {Array} tiers - Array of tier objects with {limit, rate}
- * @returns {Number} Cost in dollars
+ * @returns {Number} Cost in INR
  */
 const calculateTieredCost = (totalKWh, tiers) => {
     let cost = 0;
@@ -80,7 +253,7 @@ const calculateTieredCost = (totalKWh, tiers) => {
 };
 
 /**
- * Calculate total cost for a period
+ * Calculate total cost for a period using Indian slab-based tariff
  * @param {String} homeId - Home ID
  * @param {Date} startDate - Start date
  * @param {Date} endDate - End date
@@ -98,23 +271,37 @@ const calculatePeriodCost = async (homeId, startDate, endDate, options = {}) => 
         timestamp: { $gte: startDate, $lte: endDate },
     }).populate('device', 'name type');
 
+    // Get effective rate for cost calculation
+    const effectiveRate = home.useSlabPricing !== false
+        ? getEffectiveRate(100, home.tariffSlabs || DEFAULT_TARIFF_SLABS) // Use rate for ~100 units as estimate
+        : (home.electricityRate || 6);
+
     if (readings.length === 0) {
         return {
             totalKWh: 0,
             totalCost: 0,
-            avgRate: home.electricityRate,
+            avgRate: effectiveRate,
             readingCount: 0,
             deviceBreakdown: [],
             dailyBreakdown: [],
+            billBreakdown: null,
+            currency: 'INR',
+            currencySymbol: '₹',
         };
     }
 
-    // Calculate totals
+    // Calculate total kWh
     const totalKWh = readings.reduce((sum, r) => sum + r.kWh, 0);
-    let totalCost;
 
-    // Use different pricing methods if specified
-    if (options.rateStructure === 'TOU' && options.touRates) {
+    // Calculate total cost using slab-based pricing
+    let totalCost;
+    let billBreakdown = null;
+
+    if (home.useSlabPricing !== false) {
+        // Use Indian slab-based tariff
+        billBreakdown = calculateMonthlyBill(totalKWh, home);
+        totalCost = billBreakdown.energyCharges; // Just energy charges for period cost (fixed charges added at month level)
+    } else if (options.rateStructure === 'TOU' && options.touRates) {
         totalCost = readings.reduce(
             (sum, r) => sum + calculateTOUCost(r.kWh, r.timestamp, options.touRates),
             0
@@ -123,11 +310,11 @@ const calculatePeriodCost = async (homeId, startDate, endDate, options = {}) => 
         totalCost = calculateTieredCost(totalKWh, options.tiers);
     } else {
         // Simple flat rate
-        totalCost = readings.reduce(
-            (sum, r) => sum + calculateReadingCost(r.kWh, home.electricityRate),
-            0
-        );
+        totalCost = totalKWh * (home.electricityRate || 6);
     }
+
+    // Calculate effective rate for this consumption
+    const actualEffectiveRate = totalKWh > 0 ? totalCost / totalKWh : effectiveRate;
 
     // Device breakdown
     const deviceMap = {};
@@ -144,7 +331,8 @@ const calculatePeriodCost = async (homeId, startDate, endDate, options = {}) => 
             };
         }
         deviceMap[deviceId].totalKWh += reading.kWh;
-        deviceMap[deviceId].totalCost += calculateReadingCost(reading.kWh, home.electricityRate);
+        // Use effective rate for device cost calculation
+        deviceMap[deviceId].totalCost += reading.kWh * actualEffectiveRate;
         deviceMap[deviceId].readingCount += 1;
     });
 
@@ -170,7 +358,7 @@ const calculatePeriodCost = async (homeId, startDate, endDate, options = {}) => 
             };
         }
         dailyMap[date].totalKWh += reading.kWh;
-        dailyMap[date].totalCost += calculateReadingCost(reading.kWh, home.electricityRate);
+        dailyMap[date].totalCost += reading.kWh * actualEffectiveRate;
         dailyMap[date].readingCount += 1;
     });
 
@@ -185,14 +373,17 @@ const calculatePeriodCost = async (homeId, startDate, endDate, options = {}) => 
     return {
         totalKWh: parseFloat(totalKWh.toFixed(4)),
         totalCost: parseFloat(totalCost.toFixed(2)),
-        avgRate: home.electricityRate,
-        avgDailyCost: parseFloat((totalCost / dailyBreakdown.length).toFixed(2)),
-        avgDailyKWh: parseFloat((totalKWh / dailyBreakdown.length).toFixed(4)),
+        avgRate: parseFloat(actualEffectiveRate.toFixed(2)),
+        avgDailyCost: parseFloat((totalCost / Math.max(dailyBreakdown.length, 1)).toFixed(2)),
+        avgDailyKWh: parseFloat((totalKWh / Math.max(dailyBreakdown.length, 1)).toFixed(4)),
         readingCount: readings.length,
         deviceBreakdown,
         dailyBreakdown,
+        billBreakdown,
         startDate,
         endDate,
+        currency: 'INR',
+        currencySymbol: '₹',
     };
 };
 
@@ -382,4 +573,10 @@ module.exports = {
     comparePeriodCosts,
     calculateDeviceEfficiency,
     calculateRateSavings,
+    // Indian tariff slab functions
+    calculateSlabCost,
+    calculateSimpleSlabCost,
+    calculateMonthlyBill,
+    getEffectiveRate,
+    DEFAULT_TARIFF_SLABS,
 };
