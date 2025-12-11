@@ -32,4 +32,17 @@ export const reportService = {
         });
         return response.data;
     },
+
+    getCostAnalysis: async (params) => {
+        const response = await api.get('/reports/cost-analysis', { params });
+        return response.data;
+    },
+
+    getMonthlyReport: async (homeId, month, year) => {
+        const response = await api.get('/reports/monthly', {
+            params: { homeId, month, year },
+            responseType: 'blob',
+        });
+        return response.data;
+    },
 };

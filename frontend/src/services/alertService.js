@@ -1,8 +1,8 @@
 import api from './api';
 
 export const alertService = {
-    getAlerts: async (deviceId) => {
-        const response = await api.get('/alerts', { params: { deviceId } });
+    getAlerts: async (params) => {
+        const response = await api.get('/alerts/user', { params });
         return response.data;
     },
 
@@ -26,8 +26,8 @@ export const alertService = {
         return response.data;
     },
 
-    toggleAlert: async (id) => {
-        const response = await api.patch(`/alerts/${id}/toggle`);
+    toggleAlert: async (id, isEnabled) => {
+        const response = await api.put(`/alerts/${id}`, { isEnabled });
         return response.data;
     },
 
@@ -36,8 +36,13 @@ export const alertService = {
         return response.data;
     },
 
-    acknowledgeAlert: async (id) => {
-        const response = await api.patch(`/alerts/triggered/${id}/acknowledge`);
+    markTriggeredAlertRead: async (id) => {
+        const response = await api.put(`/alerts/triggered/${id}/read`);
+        return response.data;
+    },
+
+    markTriggeredAlertResolved: async (id) => {
+        const response = await api.put(`/alerts/triggered/${id}/resolve`);
         return response.data;
     },
 };

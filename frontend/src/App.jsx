@@ -12,6 +12,10 @@ import Devices from './pages/Devices';
 import DeviceDetail from './pages/DeviceDetail';
 import Alerts from './pages/Alerts';
 import Reports from './pages/Reports';
+import Settings from './pages/Settings';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import DeviceTemplates from './pages/admin/DeviceTemplates';
+import CommunityInsights from './pages/admin/CommunityInsights';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,6 +85,48 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Reports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Admin Routes */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/device-templates"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <DeviceTemplates />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/community-insights"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <CommunityInsights />
                 </ProtectedRoute>
               }
             />
