@@ -178,7 +178,15 @@ const DeviceDetail = () => {
                                         </div>
                                         <div>
                                             <p className="opacity-75">Session Cost</p>
-                                            <p className="font-semibold">${consumption.sessionCost?.toFixed(4) || '0'}</p>
+                                            <p className="font-bold text-yellow-200 text-lg">${consumption.sessionCost?.toFixed(4) || '0'}</p>
+                                        </div>
+                                        <div>
+                                            <p className="opacity-75">Duration</p>
+                                            <p className="font-semibold">{consumption.sessionDuration?.toFixed(1) || '0'} min</p>
+                                        </div>
+                                        <div>
+                                            <p className="opacity-75">Rate</p>
+                                            <p className="font-semibold">${consumption.electricityRate?.toFixed(2) || '0.12'}/kWh</p>
                                         </div>
                                     </div>
                                 )}

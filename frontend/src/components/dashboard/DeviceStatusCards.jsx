@@ -133,15 +133,35 @@ const DeviceStatusCard = ({ device, onEdit, onDelete, onToggle, isHovered, setHo
                                     </span>
                                 )}
                             </div>
-                            <div className="flex justify-between items-end">
-                                <span className="text-2xl font-bold text-green-600">
-                                    {consumption?.currentWatts || device.wattage || 0}W
-                                </span>
-                                {consumption?.sessionKWh > 0 && (
-                                    <span className="text-sm text-green-700">
-                                        {consumption.sessionKWh.toFixed(4)} kWh
-                                    </span>
-                                )}
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <div className="text-xs text-green-600">Power</div>
+                                    <div className="text-lg font-bold text-green-600">
+                                        {consumption?.currentWatts || device.wattage || 0}W
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-xs text-green-600">Energy</div>
+                                    <div className="text-lg font-bold text-green-700">
+                                        {consumption?.sessionKWh?.toFixed(4) || '0.0000'} kWh
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-xs text-green-600">Duration</div>
+                                    <div className="font-semibold text-green-700">
+                                        {consumption?.sessionDuration?.toFixed(1) || '0'} min
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-xs text-orange-600 font-medium">Cost</div>
+                                    <div className="text-lg font-bold text-orange-600">
+                                        ${consumption?.sessionCost?.toFixed(4) || '0.0000'}
+                                    </div>
+                                </div>
+                            </div>
+                            {/* Rate info */}
+                            <div className="mt-2 pt-2 border-t border-green-200 text-xs text-gray-500 text-center">
+                                Rate: ${consumption?.electricityRate?.toFixed(2) || '0.12'}/kWh
                             </div>
                         </div>
                     )}

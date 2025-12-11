@@ -99,6 +99,11 @@ const ActiveDeviceCard = ({ device }) => {
                         {consumption.sessionKWh.toFixed(4)} kWh
                     </p>
                 )}
+                {consumption?.sessionCost > 0 && (
+                    <p className="text-xs font-medium text-orange-600 mt-1">
+                        ${consumption.sessionCost.toFixed(4)}
+                    </p>
+                )}
             </div>
         </div>
     );
@@ -146,6 +151,8 @@ const StatCard = ({ title, value, icon: Icon, trend, color = 'blue', subtitle, l
 const Dashboard = () => {
     const queryClient = useQueryClient();
     const [totalLiveConsumption, setTotalLiveConsumption] = useState(0);
+    const [totalLiveKWh, setTotalLiveKWh] = useState(0);
+    const [totalLiveCost, setTotalLiveCost] = useState(0);
     const liveIntervalRef = useRef(null);
 
     const { data: homesData, isLoading: homesLoading } = useQuery({
@@ -154,6 +161,7 @@ const Dashboard = () => {
     });
 
     const primaryHomeId = homesData?.homes?.[0]?._id;
+    const electricityRate = homesData?.homes?.[0]?.electricityRate || 0.12;
 
     // Get devices for the primary home
     const { data: devicesData, isLoading: devicesLoading } = useQuery({
@@ -171,17 +179,37 @@ const Dashboard = () => {
     const devices = devicesData?.devices || [];
     const activeDevices = devices.filter(d => d.isActive);
 
-    // Calculate live total consumption from active devices
+    // Calculate live total consumption, kWh and cost from active devices
     useEffect(() => {
-        const calculateLiveConsumption = () => {
-            const total = activeDevices.reduce((sum, device) => sum + (device.wattage || 0), 0);
-            setTotalLiveConsumption(total);
+        const calculateLiveStats = async () => {
+            // Calculate total watts
+            const totalWatts = activeDevices.reduce((sum, device) => sum + (device.wattage || 0), 0);
+            setTotalLiveConsumption(totalWatts);
+
+            // Fetch consumption for each active device and sum up
+            let totalKWh = 0;
+            let totalCost = 0;
+
+            for (const device of activeDevices) {
+                try {
+                    const data = await deviceService.getCurrentConsumption(device._id);
+                    if (data.consumption) {
+                        totalKWh += data.consumption.sessionKWh || 0;
+                        totalCost += data.consumption.sessionCost || 0;
+                    }
+                } catch (error) {
+                    console.error('Error fetching device consumption:', error);
+                }
+            }
+
+            setTotalLiveKWh(totalKWh);
+            setTotalLiveCost(totalCost);
         };
 
-        calculateLiveConsumption();
+        calculateLiveStats();
 
         if (activeDevices.length > 0) {
-            liveIntervalRef.current = setInterval(calculateLiveConsumption, 5000);
+            liveIntervalRef.current = setInterval(calculateLiveStats, 5000);
         }
 
         return () => {
@@ -216,22 +244,38 @@ const Dashboard = () => {
                 {/* Live Consumption Banner (if any device is active) */}
                 {activeDevices.length > 0 && (
                     <Card className="bg-gradient-to-r from-green-500 to-emerald-600 text-white">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                             <div className="flex items-center space-x-4">
                                 <div className="p-3 bg-white/20 rounded-full">
                                     <Activity className="h-8 w-8" />
                                 </div>
                                 <div>
-                                    <p className="text-sm opacity-90">Live Power Consumption</p>
+                                    <div className="flex items-center space-x-2">
+                                        <p className="text-sm opacity-90">Live Power Consumption</p>
+                                        <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                                    </div>
                                     <p className="text-3xl font-bold">{totalLiveConsumption}W</p>
                                     <p className="text-sm opacity-90 mt-1">
                                         {activeDevices.length} device{activeDevices.length !== 1 ? 's' : ''} currently running
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center space-x-2">
-                                <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
-                                <span className="text-sm font-medium">Live</span>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+                                <div className="bg-white/10 rounded-lg p-3 text-center">
+                                    <p className="text-xs opacity-75">Total Energy</p>
+                                    <p className="text-xl font-bold">{totalLiveKWh.toFixed(4)}</p>
+                                    <p className="text-xs opacity-75">kWh</p>
+                                </div>
+                                <div className="bg-white/10 rounded-lg p-3 text-center">
+                                    <p className="text-xs opacity-75">Total Cost</p>
+                                    <p className="text-xl font-bold text-yellow-200">${totalLiveCost.toFixed(4)}</p>
+                                    <p className="text-xs opacity-75">USD</p>
+                                </div>
+                                <div className="bg-white/10 rounded-lg p-3 text-center col-span-2 md:col-span-1">
+                                    <p className="text-xs opacity-75">Rate</p>
+                                    <p className="text-xl font-bold">${electricityRate.toFixed(2)}</p>
+                                    <p className="text-xs opacity-75">per kWh</p>
+                                </div>
                             </div>
                         </div>
                     </Card>
@@ -253,18 +297,20 @@ const Dashboard = () => {
                         color="green"
                     />
                     <StatCard
-                        title="Current Power"
-                        value={`${totalLiveConsumption}W`}
+                        title="Live Energy"
+                        value={`${totalLiveKWh.toFixed(4)} kWh`}
                         icon={Activity}
+                        subtitle={`${totalLiveConsumption}W current power`}
                         live={activeDevices.length > 0}
                         color="blue"
                     />
                     <StatCard
-                        title="Total Cost"
-                        value={formatCurrency(totalCost)}
+                        title="Live Cost"
+                        value={`$${totalLiveCost.toFixed(4)}`}
                         icon={DollarSign}
-                        trend={-3.1}
-                        color="green"
+                        subtitle={`Rate: $${electricityRate.toFixed(2)}/kWh`}
+                        live={activeDevices.length > 0}
+                        color="yellow"
                     />
                 </div>
 

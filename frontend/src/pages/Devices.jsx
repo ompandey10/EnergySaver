@@ -198,9 +198,13 @@ const DeviceCard = ({ device, onToggle }) => {
                                     <div className="font-semibold text-green-700">{consumption.sessionDuration?.toFixed(1) || '0'} min</div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-green-600">Est. Cost</div>
-                                    <div className="font-semibold text-blue-600">${consumption.sessionCost?.toFixed(4) || '0.0000'}</div>
+                                    <div className="text-xs text-orange-600">Est. Cost</div>
+                                    <div className="font-bold text-orange-600">${consumption.sessionCost?.toFixed(4) || '0.0000'}</div>
                                 </div>
+                            </div>
+                            {/* Rate info */}
+                            <div className="mt-2 pt-2 border-t border-green-200 text-xs text-gray-500">
+                                Rate: ${consumption.electricityRate?.toFixed(2) || '0.12'}/kWh
                             </div>
                         </div>
                     </div>
