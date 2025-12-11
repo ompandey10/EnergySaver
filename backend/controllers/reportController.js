@@ -50,6 +50,19 @@ const getMonthlyReport = asyncHandler(async (req, res) => {
         });
     }
 
+    // Check if requested period is before account creation
+    const accountCreatedAt = req.user.createdAt;
+    if (accountCreatedAt) {
+        const requestedDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+        const accountMonth = new Date(accountCreatedAt.getFullYear(), accountCreatedAt.getMonth(), 1);
+        if (requestedDate < accountMonth) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot generate reports before your account was created (${accountCreatedAt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })})`,
+            });
+        }
+    }
+
     // Generate PDF report
     const pdfPath = await generateMonthlyReport(homeId, parseInt(year), parseInt(month));
 
@@ -366,10 +379,245 @@ const getDashboardSummary = asyncHandler(async (req, res) => {
     });
 });
 
+/**
+ * @desc    Get consumption report for a home
+ * @route   GET /api/reports/consumption/:homeId
+ * @access  Private
+ */
+const getConsumptionReport = asyncHandler(async (req, res) => {
+    const { homeId } = req.params;
+    const { month, year, startDate, endDate } = req.query;
+
+    // Verify home ownership
+    const home = await Home.findById(homeId).populate('devices');
+    if (!home) {
+        return res.status(404).json({
+            success: false,
+            message: 'Home not found',
+        });
+    }
+
+    if (home.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        return res.status(403).json({
+            success: false,
+            message: 'Not authorized to access this home',
+        });
+    }
+
+    // Determine date range
+    let start, end;
+    if (month && year) {
+        start = new Date(parseInt(year), parseInt(month) - 1, 1);
+        end = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+    } else if (startDate && endDate) {
+        start = new Date(startDate);
+        end = new Date(endDate);
+    } else {
+        // Default to current month
+        const now = new Date();
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    }
+
+    // Check if requested period is before account creation
+    const accountCreatedAt = req.user.createdAt;
+    if (accountCreatedAt) {
+        const accountMonth = new Date(accountCreatedAt.getFullYear(), accountCreatedAt.getMonth(), 1);
+        if (start < accountMonth) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot generate reports before your account was created (${accountCreatedAt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })})`,
+                accountCreatedAt: accountCreatedAt,
+            });
+        }
+    }
+
+    // Get readings for the period
+    const Reading = require('../models/Reading');
+    const Device = require('../models/Device');
+
+    const devices = await Device.find({ home: homeId });
+    const deviceIds = devices.map(d => d._id);
+
+    const readings = await Reading.find({
+        device: { $in: deviceIds },
+        timestamp: { $gte: start, $lte: end },
+    }).populate('device', 'name type wattage location');
+
+    // Calculate totals
+    let totalKWh = 0;
+    let totalCost = 0;
+    const deviceBreakdown = {};
+    const dailyData = {};
+
+    readings.forEach(reading => {
+        totalKWh += reading.kWh || 0;
+        totalCost += reading.cost || 0;
+
+        // Device breakdown
+        const deviceId = reading.device?._id?.toString();
+        if (deviceId) {
+            if (!deviceBreakdown[deviceId]) {
+                deviceBreakdown[deviceId] = {
+                    deviceId,
+                    name: reading.device.name,
+                    type: reading.device.type,
+                    totalKWh: 0,
+                    totalCost: 0,
+                    readingCount: 0,
+                };
+            }
+            deviceBreakdown[deviceId].totalKWh += reading.kWh || 0;
+            deviceBreakdown[deviceId].totalCost += reading.cost || 0;
+            deviceBreakdown[deviceId].readingCount++;
+        }
+
+        // Daily breakdown
+        const day = reading.timestamp.toISOString().split('T')[0];
+        if (!dailyData[day]) {
+            dailyData[day] = { date: day, kWh: 0, cost: 0 };
+        }
+        dailyData[day].kWh += reading.kWh || 0;
+        dailyData[day].cost += reading.cost || 0;
+    });
+
+    // Convert to arrays and sort
+    const deviceStats = Object.values(deviceBreakdown).sort((a, b) => b.totalKWh - a.totalKWh);
+    const dailyStats = Object.values(dailyData).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // Calculate averages
+    const daysInPeriod = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    const avgDailyKWh = daysInPeriod > 0 ? totalKWh / daysInPeriod : 0;
+    const avgDailyCost = daysInPeriod > 0 ? totalCost / daysInPeriod : 0;
+
+    // Check if this is the current month - add live consumption from active devices
+    const now = new Date();
+    const isCurrentMonth = (
+        start.getMonth() === now.getMonth() &&
+        start.getFullYear() === now.getFullYear()
+    );
+
+    let liveConsumption = null;
+    if (isCurrentMonth) {
+        const activeDevices = devices.filter(d => d.isActive && d.lastTurnedOn);
+        let liveTotalKWh = 0;
+        let liveTotalCost = 0;
+        let liveTotalWatts = 0;
+        const liveDevices = [];
+
+        for (const device of activeDevices) {
+            const sessionStart = device.lastTurnedOn;
+            const sessionDuration = (now - sessionStart) / (1000 * 60 * 60); // hours
+            const sessionKWh = (device.wattage * sessionDuration) / 1000;
+            const sessionCost = sessionKWh * (home.electricityRate || 0.12);
+
+            liveTotalKWh += sessionKWh;
+            liveTotalCost += sessionCost;
+            liveTotalWatts += device.wattage || 0;
+
+            liveDevices.push({
+                deviceId: device._id,
+                name: device.name,
+                type: device.type,
+                wattage: device.wattage,
+                location: device.location,
+                sessionStart: sessionStart,
+                sessionDuration: parseFloat((sessionDuration * 60).toFixed(2)), // minutes
+                sessionKWh: parseFloat(sessionKWh.toFixed(4)),
+                sessionCost: parseFloat(sessionCost.toFixed(4)),
+            });
+
+            // Add live consumption to device breakdown
+            const deviceId = device._id.toString();
+            if (deviceBreakdown[deviceId]) {
+                deviceBreakdown[deviceId].liveKWh = parseFloat(sessionKWh.toFixed(4));
+                deviceBreakdown[deviceId].liveCost = parseFloat(sessionCost.toFixed(4));
+                deviceBreakdown[deviceId].totalKWh += sessionKWh;
+                deviceBreakdown[deviceId].totalCost += sessionCost;
+            } else {
+                deviceBreakdown[deviceId] = {
+                    deviceId,
+                    name: device.name,
+                    type: device.type,
+                    totalKWh: parseFloat(sessionKWh.toFixed(4)),
+                    totalCost: parseFloat(sessionCost.toFixed(4)),
+                    liveKWh: parseFloat(sessionKWh.toFixed(4)),
+                    liveCost: parseFloat(sessionCost.toFixed(4)),
+                    readingCount: 0,
+                    isLiveOnly: true,
+                };
+            }
+        }
+
+        liveConsumption = {
+            activeDeviceCount: activeDevices.length,
+            totalWatts: liveTotalWatts,
+            totalKWh: parseFloat(liveTotalKWh.toFixed(4)),
+            totalCost: parseFloat(liveTotalCost.toFixed(4)),
+            devices: liveDevices,
+        };
+
+        // Add live consumption to totals
+        totalKWh += liveTotalKWh;
+        totalCost += liveTotalCost;
+
+        // Add today's live data to daily breakdown
+        const today = now.toISOString().split('T')[0];
+        if (dailyData[today]) {
+            dailyData[today].kWh += liveTotalKWh;
+            dailyData[today].cost += liveTotalCost;
+            dailyData[today].liveKWh = liveTotalKWh;
+            dailyData[today].liveCost = liveTotalCost;
+        } else {
+            dailyData[today] = {
+                date: today,
+                kWh: liveTotalKWh,
+                cost: liveTotalCost,
+                liveKWh: liveTotalKWh,
+                liveCost: liveTotalCost,
+            };
+        }
+    }
+
+    // Recalculate device stats with live data
+    const finalDeviceStats = Object.values(deviceBreakdown).sort((a, b) => b.totalKWh - a.totalKWh);
+    const finalDailyStats = Object.values(dailyData).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    res.status(200).json({
+        success: true,
+        report: {
+            home: {
+                _id: home._id,
+                name: home.name,
+                electricityRate: home.electricityRate || 0.12,
+            },
+            period: {
+                start: start.toISOString(),
+                end: end.toISOString(),
+                days: daysInPeriod,
+                isCurrentMonth,
+            },
+            summary: {
+                totalKWh: parseFloat(totalKWh.toFixed(4)),
+                totalCost: parseFloat(totalCost.toFixed(2)),
+                avgDailyKWh: parseFloat(avgDailyKWh.toFixed(4)),
+                avgDailyCost: parseFloat(avgDailyCost.toFixed(2)),
+                totalReadings: readings.length,
+                totalDevices: devices.length,
+                activeDevices: devices.filter(d => d.isActive).length,
+            },
+            liveConsumption,
+            deviceBreakdown: finalDeviceStats,
+            dailyBreakdown: finalDailyStats,
+        },
+    });
+});
+
 module.exports = {
     getMonthlyReport,
     getNeighborhoodComparison,
     getSavingsTips,
     getCostAnalysis,
     getDashboardSummary,
+    getConsumptionReport,
 };

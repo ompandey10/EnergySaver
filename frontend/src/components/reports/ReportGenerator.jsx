@@ -1,19 +1,33 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Calendar, Download, FileText, Loader2 } from 'lucide-react';
+import { Calendar, Download, FileText, Loader2, AlertCircle } from 'lucide-react';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import { homeService } from '../../services/homeService';
 import { reportService } from '../../services/reportService';
+import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL, AUTH_TOKEN_KEY } from '../../config/constants';
 import toast from 'react-hot-toast';
 
 const ReportGenerator = ({ onReportGenerated }) => {
+    const { user } = useAuth();
     const currentDate = new Date();
     const [selectedHome, setSelectedHome] = useState('');
     const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
     const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
     const [isGenerating, setIsGenerating] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
+
+    // Get account creation date
+    const accountCreatedAt = useMemo(() => {
+        if (user?.createdAt) {
+            return new Date(user.createdAt);
+        }
+        return null;
+    }, [user]);
+
+    const accountCreationMonth = accountCreatedAt?.getMonth() + 1;
+    const accountCreationYear = accountCreatedAt?.getFullYear();
 
     // Fetch homes
     const { data: homesData, isLoading: homesLoading } = useQuery({
@@ -23,8 +37,8 @@ const ReportGenerator = ({ onReportGenerated }) => {
 
     const homes = homesData?.homes || [];
 
-    // Generate available months (last 12 months)
-    const months = [
+    // All months
+    const allMonths = [
         { value: 1, label: 'January' },
         { value: 2, label: 'February' },
         { value: 3, label: 'March' },
@@ -39,11 +53,43 @@ const ReportGenerator = ({ onReportGenerated }) => {
         { value: 12, label: 'December' },
     ];
 
-    // Generate available years (current year and 2 previous years)
-    const years = [];
-    for (let i = 0; i <= 2; i++) {
-        years.push(currentDate.getFullYear() - i);
-    }
+    // Filter months based on account creation and selected year
+    const months = useMemo(() => {
+        return allMonths.map(month => {
+            // Check if this month is before account creation
+            let isDisabled = false;
+            if (accountCreationYear && accountCreationMonth) {
+                if (selectedYear < accountCreationYear) {
+                    isDisabled = true;
+                } else if (selectedYear === accountCreationYear && month.value < accountCreationMonth) {
+                    isDisabled = true;
+                }
+            }
+            // Also disable future months
+            if (selectedYear === currentDate.getFullYear() && month.value > currentDate.getMonth() + 1) {
+                isDisabled = true;
+            }
+            return { ...month, disabled: isDisabled };
+        });
+    }, [selectedYear, accountCreationYear, accountCreationMonth, currentDate]);
+
+    // Generate available years (from account creation year to current year)
+    const years = useMemo(() => {
+        const yearList = [];
+        const startYear = accountCreationYear || (currentDate.getFullYear() - 2);
+        for (let y = currentDate.getFullYear(); y >= startYear; y--) {
+            yearList.push(y);
+        }
+        return yearList;
+    }, [accountCreationYear, currentDate]);
+
+    // Check if selected period is valid (not before account creation)
+    const isSelectedPeriodValid = useMemo(() => {
+        if (!accountCreationYear || !accountCreationMonth) return true;
+        if (selectedYear < accountCreationYear) return false;
+        if (selectedYear === accountCreationYear && selectedMonth < accountCreationMonth) return false;
+        return true;
+    }, [selectedYear, selectedMonth, accountCreationYear, accountCreationMonth]);
 
     const handleGenerateReport = async () => {
         if (!selectedHome) {
@@ -83,20 +129,38 @@ const ReportGenerator = ({ onReportGenerated }) => {
 
         setIsDownloading(true);
         try {
+            const token = localStorage.getItem(AUTH_TOKEN_KEY);
+            if (!token) {
+                toast.error('Please login to download reports');
+                return;
+            }
+
             const response = await fetch(
-                `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/reports/monthly?homeId=${selectedHome}&month=${selectedMonth}&year=${selectedYear}`,
+                `${API_BASE_URL}/reports/monthly?homeId=${selectedHome}&month=${selectedMonth}&year=${selectedYear}`,
                 {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                        'Authorization': `Bearer ${token}`,
                     },
                 }
             );
 
             if (!response.ok) {
-                throw new Error('Failed to download report');
+                // Try to parse error message from response
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to download report');
+                }
+                throw new Error(`Failed to download report (${response.status})`);
             }
 
             const blob = await response.blob();
+
+            // Check if we got a valid PDF
+            if (blob.size === 0) {
+                throw new Error('No data available for this period');
+            }
+
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -107,7 +171,8 @@ const ReportGenerator = ({ onReportGenerated }) => {
             document.body.removeChild(a);
             toast.success('Report downloaded successfully');
         } catch (error) {
-            toast.error('Failed to download PDF report');
+            console.error('PDF download error:', error);
+            toast.error(error.message || 'Failed to download PDF report');
         } finally {
             setIsDownloading(false);
         }
@@ -148,8 +213,12 @@ const ReportGenerator = ({ onReportGenerated }) => {
                             className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         >
                             {months.map(month => (
-                                <option key={month.value} value={month.value}>
-                                    {month.label}
+                                <option
+                                    key={month.value}
+                                    value={month.value}
+                                    disabled={month.disabled}
+                                >
+                                    {month.label}{month.disabled ? ' (N/A)' : ''}
                                 </option>
                             ))}
                         </select>
@@ -172,19 +241,32 @@ const ReportGenerator = ({ onReportGenerated }) => {
                     </div>
                 </div>
 
+                {/* Warning for invalid period */}
+                {!isSelectedPeriodValid && (
+                    <div className="flex items-center p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
+                        <span className="text-sm text-red-700">
+                            Cannot generate reports before your account was created
+                            ({allMonths[accountCreationMonth - 1]?.label} {accountCreationYear})
+                        </span>
+                    </div>
+                )}
+
                 {/* Selected Period Info */}
-                <div className="flex items-center p-3 bg-blue-50 rounded-lg">
-                    <Calendar className="h-5 w-5 text-blue-600 mr-2" />
-                    <span className="text-sm text-blue-800">
-                        Report Period: {months.find(m => m.value === selectedMonth)?.label} {selectedYear}
-                    </span>
-                </div>
+                {isSelectedPeriodValid && (
+                    <div className="flex items-center p-3 bg-blue-50 rounded-lg">
+                        <Calendar className="h-5 w-5 text-blue-600 mr-2" />
+                        <span className="text-sm text-blue-800">
+                            Report Period: {allMonths.find(m => m.value === selectedMonth)?.label} {selectedYear}
+                        </span>
+                    </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3">
                     <Button
                         onClick={handleGenerateReport}
-                        disabled={!selectedHome || isGenerating}
+                        disabled={!selectedHome || isGenerating || !isSelectedPeriodValid}
                         isLoading={isGenerating}
                         className="flex-1"
                     >
@@ -194,7 +276,7 @@ const ReportGenerator = ({ onReportGenerated }) => {
                     <Button
                         variant="outline"
                         onClick={handleDownloadPDF}
-                        disabled={!selectedHome || isDownloading}
+                        disabled={!selectedHome || isDownloading || !isSelectedPeriodValid}
                         isLoading={isDownloading}
                         className="flex-1"
                     >

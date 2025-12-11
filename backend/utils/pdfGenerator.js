@@ -4,6 +4,7 @@ const path = require('path');
 const Home = require('../models/Home');
 const Reading = require('../models/Reading');
 const Device = require('../models/Device');
+const User = require('../models/User'); // Required for populate
 const { calculateMonthlyCost } = require('./costCalculator');
 const { compareToNeighborhood } = require('./comparisonEngine');
 const { generateTips, calculatePotentialSavings } = require('./tipGenerator');
@@ -63,8 +64,12 @@ const generateMonthlyReport = async (homeId, year, month, outputPath = null) => 
             );
         }
 
-        // Create PDF
-        const doc = new PDFDocument({ margin: 50, size: 'A4' });
+        // Create PDF with buffering enabled for footer page numbers
+        const doc = new PDFDocument({
+            margin: 50,
+            size: 'A4',
+            bufferPages: true
+        });
         const stream = fs.createWriteStream(outputPath);
         doc.pipe(stream);
 
@@ -151,6 +156,12 @@ const addExecutiveSummary = (doc, costData, comparisonData) => {
         .fontSize(12)
         .font('Helvetica');
 
+    // Safely get values with defaults
+    const totalCost = costData?.totalCost || 0;
+    const totalKWh = costData?.totalKWh || 0;
+    const avgDailyCost = costData?.avgDailyCost || 0;
+    const avgDailyKWh = costData?.avgDailyKWh || 0;
+
     // Cost summary box
     const boxY = doc.y;
     doc
@@ -166,13 +177,13 @@ const addExecutiveSummary = (doc, costData, comparisonData) => {
     doc
         .fontSize(28)
         .fillColor('#2563eb')
-        .text(`$${costData.totalCost.toFixed(2)}`, 60, boxY + 40);
+        .text(`$${totalCost.toFixed(2)}`, 60, boxY + 40);
 
     doc
         .fontSize(10)
         .fillColor('#6b7280')
         .font('Helvetica')
-        .text(`${costData.totalKWh.toFixed(2)} kWh used`, 60, boxY + 75);
+        .text(`${totalKWh.toFixed(2)} kWh used`, 60, boxY + 75);
 
     // Usage summary box
     doc
@@ -188,13 +199,13 @@ const addExecutiveSummary = (doc, costData, comparisonData) => {
     doc
         .fontSize(20)
         .fillColor('#f59e0b')
-        .text(`$${costData.avgDailyCost.toFixed(2)}`, 320, boxY + 45);
+        .text(`$${avgDailyCost.toFixed(2)}`, 320, boxY + 45);
 
     doc
         .fontSize(10)
         .fillColor('#6b7280')
         .font('Helvetica')
-        .text(`${costData.avgDailyKWh.toFixed(2)} kWh/day`, 320, boxY + 75);
+        .text(`${avgDailyKWh.toFixed(2)} kWh/day`, 320, boxY + 75);
 
     doc.y = boxY + 120;
     doc.moveDown(0.5);
@@ -230,6 +241,17 @@ const addUsageBreakdown = (doc, costData) => {
         .fontSize(12)
         .font('Helvetica');
 
+    const deviceBreakdown = costData?.deviceBreakdown || [];
+
+    if (deviceBreakdown.length === 0) {
+        doc
+            .fontSize(11)
+            .fillColor('#6b7280')
+            .text('No usage data available for this period.', { align: 'left' })
+            .moveDown(1);
+        return;
+    }
+
     const tableTop = doc.y;
     const tableHeaders = ['Category', 'Usage (kWh)', 'Cost', 'Percentage'];
     const colWidths = [200, 100, 100, 100];
@@ -254,8 +276,8 @@ const addUsageBreakdown = (doc, costData) => {
 
     // Group by category
     const categoryMap = {};
-    costData.deviceBreakdown.forEach(device => {
-        const category = device.deviceType.replace(/_/g, ' ').toUpperCase();
+    deviceBreakdown.forEach(device => {
+        const category = (device.deviceType || 'Other').replace(/_/g, ' ').toUpperCase();
         if (!categoryMap[category]) {
             categoryMap[category] = {
                 totalKWh: 0,
@@ -263,9 +285,9 @@ const addUsageBreakdown = (doc, costData) => {
                 percentage: 0,
             };
         }
-        categoryMap[category].totalKWh += device.totalKWh;
-        categoryMap[category].totalCost += device.totalCost;
-        categoryMap[category].percentage += device.percentage;
+        categoryMap[category].totalKWh += device.totalKWh || 0;
+        categoryMap[category].totalCost += device.totalCost || 0;
+        categoryMap[category].percentage += device.percentage || 0;
     });
 
     Object.entries(categoryMap)
@@ -310,27 +332,43 @@ const addDeviceAnalysis = (doc, deviceBreakdown, devices) => {
 
     doc.fontSize(12).font('Helvetica');
 
+    const breakdown = deviceBreakdown || [];
+
+    if (breakdown.length === 0) {
+        doc
+            .fontSize(11)
+            .fillColor('#6b7280')
+            .text('No device data available for this period.', { align: 'left' })
+            .moveDown(1);
+        return;
+    }
+
     // Top 5 devices
-    deviceBreakdown.slice(0, 5).forEach((device, index) => {
+    breakdown.slice(0, 5).forEach((device, index) => {
         if (doc.y > 700) {
             doc.addPage();
         }
+
+        const deviceType = (device.deviceType || 'Unknown').replace(/_/g, ' ');
+        const totalKWh = device.totalKWh || 0;
+        const totalCost = device.totalCost || 0;
+        const percentage = device.percentage || 0;
 
         doc
             .fontSize(12)
             .font('Helvetica-Bold')
             .fillColor('#1f2937')
-            .text(`${index + 1}. ${device.deviceName}`)
+            .text(`${index + 1}. ${device.deviceName || 'Unknown Device'}`)
             .font('Helvetica')
             .fontSize(10)
             .fillColor('#6b7280')
-            .text(`Type: ${device.deviceType.replace(/_/g, ' ')}`)
-            .text(`Usage: ${device.totalKWh.toFixed(2)} kWh (${device.percentage.toFixed(1)}%)`)
-            .text(`Cost: $${device.totalCost.toFixed(2)}`)
+            .text(`Type: ${deviceType}`)
+            .text(`Usage: ${totalKWh.toFixed(2)} kWh (${percentage.toFixed(1)}%)`)
+            .text(`Cost: $${totalCost.toFixed(2)}`)
             .moveDown(0.5);
 
         // Draw bar
-        const barWidth = (device.percentage / 100) * 400;
+        const barWidth = Math.max((percentage / 100) * 400, 5);
         doc
             .rect(50, doc.y, barWidth, 15)
             .fillAndStroke('#3b82f6', '#2563eb');
@@ -358,10 +396,21 @@ const addDailyTrends = (doc, dailyBreakdown) => {
 
     doc.fontSize(10).font('Helvetica');
 
+    const breakdown = dailyBreakdown || [];
+
+    if (breakdown.length === 0) {
+        doc
+            .fontSize(11)
+            .fillColor('#6b7280')
+            .text('No daily data available for this period.', { align: 'left' })
+            .moveDown(1);
+        return;
+    }
+
     // Simple text representation of trends
-    const avgCost = dailyBreakdown.reduce((sum, d) => sum + d.totalCost, 0) / dailyBreakdown.length;
-    const highUsageDays = dailyBreakdown.filter(d => d.totalCost > avgCost * 1.2);
-    const lowUsageDays = dailyBreakdown.filter(d => d.totalCost < avgCost * 0.8);
+    const avgCost = breakdown.reduce((sum, d) => sum + (d.totalCost || 0), 0) / breakdown.length;
+    const highUsageDays = breakdown.filter(d => (d.totalCost || 0) > avgCost * 1.2);
+    const lowUsageDays = breakdown.filter(d => (d.totalCost || 0) < avgCost * 0.8);
 
     doc
         .text(`Average daily cost: $${avgCost.toFixed(2)}`)
@@ -378,7 +427,7 @@ const addDailyTrends = (doc, dailyBreakdown) => {
             .fontSize(10);
 
         highUsageDays.slice(0, 3).forEach(day => {
-            doc.text(`  • ${day.date}: $${day.totalCost.toFixed(2)} (${day.totalKWh.toFixed(2)} kWh)`);
+            doc.text(`  • ${day.date}: $${(day.totalCost || 0).toFixed(2)} (${(day.totalKWh || 0).toFixed(2)} kWh)`);
         });
     }
 
@@ -536,17 +585,21 @@ const addSavingsTips = (doc, tips, savings) => {
 const addFooter = (doc) => {
     const pages = doc.bufferedPageRange();
 
-    for (let i = 0; i < pages.count; i++) {
+    if (!pages || pages.count === 0) {
+        return;
+    }
+
+    for (let i = pages.start; i < pages.start + pages.count; i++) {
         doc.switchToPage(i);
 
         doc
             .fontSize(8)
             .fillColor('#9ca3af')
             .text(
-                `Generated on ${new Date().toLocaleDateString()} | Page ${i + 1} of ${pages.count}`,
+                `Generated on ${new Date().toLocaleDateString()} | Page ${i - pages.start + 1} of ${pages.count}`,
                 50,
                 doc.page.height - 50,
-                { align: 'center' }
+                { align: 'center', width: doc.page.width - 100 }
             );
     }
 };

@@ -6,14 +6,18 @@ const {
     getSavingsTips,
     getCostAnalysis,
     getDashboardSummary,
+    getConsumptionReport,
 } = require('../controllers/reportController');
-const { protect, heavyOperationLimiter } = require('../middleware');
+const { protect, heavyOperationLimiter, validateMongoId } = require('../middleware');
 
 // All routes require authentication
 router.use(protect);
 
 // Monthly PDF report (heavy operation)
 router.get('/monthly', heavyOperationLimiter, getMonthlyReport);
+
+// Consumption report for a home
+router.get('/consumption/:homeId', validateMongoId('homeId'), getConsumptionReport);
 
 // Neighborhood comparison
 router.get('/comparison', getNeighborhoodComparison);
