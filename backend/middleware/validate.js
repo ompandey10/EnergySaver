@@ -95,6 +95,32 @@ const validateDevice = [
 // Alert Validations
 const validateAlert = [
     body('name')
+        .optional()
+        .trim()
+        .isLength({ max: 100 }).withMessage('Name cannot exceed 100 characters'),
+    body('homeId').optional().isMongoId().withMessage('Invalid home ID'),
+    body('deviceId').optional().isMongoId().withMessage('Invalid device ID'),
+    body('type')
+        .optional()
+        .isIn(['usage_limit', 'cost_limit', 'unusual_activity', 'device_offline']),
+    body('limitKWh')
+        .optional()
+        .isFloat({ min: 0 }).withMessage('Limit must be a positive number'),
+    body('limitCost')
+        .optional()
+        .isFloat({ min: 0 }).withMessage('Cost limit must be a positive number'),
+    body('period')
+        .optional()
+        .isIn(['hourly', 'daily', 'weekly', 'monthly']),
+    body('threshold')
+        .optional()
+        .isFloat({ min: 0, max: 100 }).withMessage('Threshold must be between 0 and 100'),
+    handleValidationErrors,
+];
+
+// Alert Create Validation (requires name)
+const validateAlertCreate = [
+    body('name')
         .trim()
         .notEmpty().withMessage('Alert name is required')
         .isLength({ max: 100 }).withMessage('Name cannot exceed 100 characters'),
@@ -173,6 +199,7 @@ module.exports = {
     validateHome,
     validateDevice,
     validateAlert,
+    validateAlertCreate,
     validateMongoId,
     validateDateRange,
     validatePagination,

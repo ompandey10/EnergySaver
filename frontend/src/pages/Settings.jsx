@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     User,
@@ -33,10 +33,19 @@ const Settings = () => {
 
     // Profile form state
     const [profileForm, setProfileForm] = useState({
-        firstName: user?.firstName || '',
-        lastName: user?.lastName || '',
+        name: user?.name || '',
         email: user?.email || '',
     });
+
+    // Sync profile form with user data when user changes
+    useEffect(() => {
+        if (user) {
+            setProfileForm({
+                name: user.name || '',
+                email: user.email || '',
+            });
+        }
+    }, [user]);
 
     // Password form state
     const [passwordForm, setPasswordForm] = useState({
@@ -74,13 +83,13 @@ const Settings = () => {
         queryFn: () => homeService.getHomes(),
     });
 
-    const homes = homesData?.data || [];
+    const homes = homesData?.homes || [];
 
     // Update profile mutation
     const updateProfileMutation = useMutation({
         mutationFn: (data) => authService.updateProfile(data),
         onSuccess: (response) => {
-            updateUser(response.data);
+            updateUser(response.user);
             toast.success('Profile updated successfully');
         },
         onError: (error) => {
@@ -221,8 +230,8 @@ const Settings = () => {
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
                                     className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center ${activeTab === tab.id
-                                            ? 'border-blue-500 text-blue-600'
-                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                        ? 'border-blue-500 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                         }`}
                                 >
                                     <Icon className="h-4 w-4 mr-2" />
@@ -241,25 +250,15 @@ const Settings = () => {
                             {/* Update Profile */}
                             <Card title="Profile Information" subtitle="Update your personal details">
                                 <form onSubmit={handleProfileSubmit} className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <Input
-                                            label="First Name"
-                                            value={profileForm.firstName}
-                                            onChange={(e) => setProfileForm(prev => ({
-                                                ...prev,
-                                                firstName: e.target.value
-                                            }))}
-                                            icon={User}
-                                        />
-                                        <Input
-                                            label="Last Name"
-                                            value={profileForm.lastName}
-                                            onChange={(e) => setProfileForm(prev => ({
-                                                ...prev,
-                                                lastName: e.target.value
-                                            }))}
-                                        />
-                                    </div>
+                                    <Input
+                                        label="Full Name"
+                                        value={profileForm.name}
+                                        onChange={(e) => setProfileForm(prev => ({
+                                            ...prev,
+                                            name: e.target.value
+                                        }))}
+                                        icon={User}
+                                    />
                                     <Input
                                         label="Email"
                                         type="email"

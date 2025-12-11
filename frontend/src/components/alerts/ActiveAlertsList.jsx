@@ -16,7 +16,7 @@ const ActiveAlertsList = ({ alerts = [], onEdit, isLoading }) => {
 
     // Toggle alert mutation
     const toggleMutation = useMutation({
-        mutationFn: (id) => alertService.toggleAlert(id),
+        mutationFn: ({ id, isEnabled }) => alertService.toggleAlert(id, isEnabled),
         onSuccess: () => {
             queryClient.invalidateQueries(['userAlerts']);
             toast.success('Alert status updated');
@@ -41,7 +41,7 @@ const ActiveAlertsList = ({ alerts = [], onEdit, isLoading }) => {
     });
 
     const handleToggle = (alert) => {
-        toggleMutation.mutate(alert._id);
+        toggleMutation.mutate({ id: alert._id, isEnabled: !alert.isEnabled });
     };
 
     const handleDeleteClick = (alert) => {
@@ -205,8 +205,8 @@ const ActiveAlertsList = ({ alerts = [], onEdit, isLoading }) => {
                                                 <button
                                                     onClick={() => handleToggle(alert)}
                                                     className={`p-2 rounded-lg transition-colors ${alert.isEnabled
-                                                            ? 'text-green-600 hover:bg-green-50'
-                                                            : 'text-gray-400 hover:bg-gray-100'
+                                                        ? 'text-green-600 hover:bg-green-50'
+                                                        : 'text-gray-400 hover:bg-gray-100'
                                                         }`}
                                                     title={alert.isEnabled ? 'Disable alert' : 'Enable alert'}
                                                     disabled={toggleMutation.isLoading}

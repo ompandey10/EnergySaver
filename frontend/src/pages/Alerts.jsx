@@ -74,8 +74,8 @@ const Alerts = () => {
         setEditingAlert(null);
     };
 
-    const alerts = alertsData?.alerts || alertsData?.data || [];
-    const triggeredAlerts = triggeredData?.data || [];
+    const alerts = alertsData?.alerts || [];
+    const triggeredAlerts = triggeredData?.triggeredAlerts || triggeredData?.data || [];
     const activeAlerts = triggeredAlerts.filter(a => !a.acknowledged);
 
     if (alertsLoading && triggeredLoading) {
@@ -159,8 +159,8 @@ const Alerts = () => {
                         <button
                             onClick={() => setActiveTab('rules')}
                             className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'rules'
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
                             <Settings className="h-4 w-4 inline mr-2" />
@@ -172,8 +172,8 @@ const Alerts = () => {
                         <button
                             onClick={() => setActiveTab('history')}
                             className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'history'
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
                             <Bell className="h-4 w-4 inline mr-2" />

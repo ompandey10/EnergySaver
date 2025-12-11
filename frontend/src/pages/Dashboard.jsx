@@ -66,8 +66,8 @@ const Dashboard = () => {
         );
     }
 
-    const homes = homesData?.data || [];
-    const alerts = alertsData?.data || [];
+    const homes = homesData?.homes || [];
+    const alerts = alertsData?.triggeredAlerts || [];
 
     // Calculate stats
     const totalDevices = homes.reduce((sum, home) => sum + (home.devices?.length || 0), 0);

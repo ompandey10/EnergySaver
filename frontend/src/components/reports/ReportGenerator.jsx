@@ -21,7 +21,7 @@ const ReportGenerator = ({ onReportGenerated }) => {
         queryFn: () => homeService.getHomes(),
     });
 
-    const homes = homesData?.data || [];
+    const homes = homesData?.homes || [];
 
     // Generate available months (last 12 months)
     const months = [

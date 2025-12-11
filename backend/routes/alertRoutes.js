@@ -14,6 +14,7 @@ const {
 const {
     protect,
     validateAlert,
+    validateAlertCreate,
     validateMongoId,
     validatePagination,
 } = require('../middleware');
@@ -31,7 +32,7 @@ router.put('/triggered/:id/resolve', validateMongoId('id'), markTriggeredAlertRe
 
 // Alert CRUD routes
 router.route('/')
-    .post(validateAlert, createAlert);
+    .post(validateAlertCreate, createAlert);
 
 router.route('/:id')
     .get(validateMongoId('id'), getAlert)

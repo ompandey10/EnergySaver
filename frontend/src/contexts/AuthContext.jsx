@@ -47,8 +47,8 @@ export const AuthProvider = ({ children }) => {
 
             if (response.success) {
                 localStorage.setItem(AUTH_TOKEN_KEY, response.token);
-                localStorage.setItem(USER_KEY, JSON.stringify(response.data));
-                setUser(response.data);
+                localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+                setUser(response.user);
                 setIsAuthenticated(true);
                 toast.success('Login successful!');
                 return { success: true };
@@ -66,8 +66,8 @@ export const AuthProvider = ({ children }) => {
 
             if (response.success) {
                 localStorage.setItem(AUTH_TOKEN_KEY, response.token);
-                localStorage.setItem(USER_KEY, JSON.stringify(response.data));
-                setUser(response.data);
+                localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+                setUser(response.user);
                 setIsAuthenticated(true);
                 toast.success('Registration successful!');
                 return { success: true };

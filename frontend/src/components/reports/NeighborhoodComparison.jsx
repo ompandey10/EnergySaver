@@ -28,8 +28,8 @@ const NeighborhoodComparison = () => {
         enabled: !!selectedHome,
     });
 
-    const homes = homesData?.data || [];
-    const comparison = comparisonData?.data || {};
+    const homes = homesData?.homes || [];
+    const comparison = comparisonData?.comparison || comparisonData?.data || {};
 
     const getPercentileColor = (percentile) => {
         if (percentile <= 25) return 'text-green-600 bg-green-100';
@@ -242,9 +242,9 @@ const NeighborhoodComparison = () => {
                                         >
                                             <div className="flex items-center">
                                                 <span className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium ${index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                                                        index === 1 ? 'bg-gray-200 text-gray-700' :
-                                                            index === 2 ? 'bg-orange-100 text-orange-800' :
-                                                                'bg-gray-100 text-gray-600'
+                                                    index === 1 ? 'bg-gray-200 text-gray-700' :
+                                                        index === 2 ? 'bg-orange-100 text-orange-800' :
+                                                            'bg-gray-100 text-gray-600'
                                                     }`}>
                                                     {index + 1}
                                                 </span>

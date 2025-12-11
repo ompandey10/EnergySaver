@@ -34,8 +34,8 @@ const CostAnalysis = () => {
         enabled: !!selectedHome,
     });
 
-    const homes = homesData?.data || [];
-    const analysis = costData?.data || {};
+    const homes = homesData?.homes || [];
+    const analysis = costData?.analysis || costData?.data || {};
 
     // Calculate ROI
     const calculateROI = () => {
