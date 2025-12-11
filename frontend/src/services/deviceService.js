@@ -40,36 +40,23 @@ export const deviceService = {
     return response.data;
   },
 
-  toggleDevice: async (id, currentState) => {
-    // First fetch the full device data
-    const deviceRes = await api.get(`/devices/${id}`);
-    const device = deviceRes.data.device || deviceRes.data.data;
+  toggleDevice: async (id) => {
+    const response = await api.put(`/devices/${id}/toggle`);
+    return response.data;
+  },
 
-    if (!device) {
-      throw new Error('Device not found');
-    }
-
-    // Get homeId - handle both populated object and direct ID
-    const homeId = device.home?._id || device.home || device.homeId;
-
-    // Send update with all required fields and toggled isActive
-    const response = await api.put(`/devices/${id}`, {
-      homeId: homeId,
-      name: device.name,
-      type: device.type,
-      wattage: device.wattage,
-      location: device.location || '',
-      brand: device.brand || '',
-      model: device.model || '',
-      isSmartDevice: device.isSmartDevice || false,
-      averageUsageHours: device.averageUsageHours || 0,
-      isActive: !currentState,
-    });
+  getCurrentConsumption: async (id) => {
+    const response = await api.get(`/devices/${id}/consumption`);
     return response.data;
   },
 
   getDeviceReadings: async (id, params) => {
     const response = await api.get(`/devices/${id}/readings`, { params });
+    return response.data;
+  },
+
+  getDeviceStats: async (id) => {
+    const response = await api.get(`/devices/${id}/stats`);
     return response.data;
   },
 

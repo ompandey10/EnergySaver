@@ -62,7 +62,7 @@ const deviceSchema = new mongoose.Schema({
     },
     isActive: {
         type: Boolean,
-        default: true,
+        default: false, // Devices start as OFF
     },
     isDeleted: {
         type: Boolean,
@@ -75,6 +75,14 @@ const deviceSchema = new mongoose.Schema({
     installedDate: {
         type: Date,
         default: Date.now,
+    },
+    lastTurnedOn: {
+        type: Date,
+        default: null,
+    },
+    lastTurnedOff: {
+        type: Date,
+        default: null,
     },
 }, {
     timestamps: true,

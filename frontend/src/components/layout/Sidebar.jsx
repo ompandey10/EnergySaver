@@ -34,6 +34,7 @@ const Sidebar = () => {
         { name: 'Devices', icon: Lightbulb, path: '/devices' },
         { name: 'Alerts', icon: Bell, path: '/alerts' },
         { name: 'Reports', icon: FileText, path: '/reports' },
+        { name: 'Profile', icon: User, path: '/profile' },
         { name: 'Settings', icon: Settings, path: '/settings' },
     ];
 

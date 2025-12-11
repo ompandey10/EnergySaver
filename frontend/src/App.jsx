@@ -13,6 +13,7 @@ import DeviceDetail from './pages/DeviceDetail';
 import Alerts from './pages/Alerts';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import Profile from './pages/Profile';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import DeviceTemplates from './pages/admin/DeviceTemplates';
 import CommunityInsights from './pages/admin/CommunityInsights';
@@ -93,6 +94,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
                 </ProtectedRoute>
               }
             />

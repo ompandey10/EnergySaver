@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { ArrowLeft, Calendar, TrendingUp, AlertCircle, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Calendar, TrendingUp, AlertCircle, Lightbulb, Power, Clock, Activity, Zap } from 'lucide-react';
+import toast from 'react-hot-toast';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
@@ -11,16 +12,88 @@ import Spinner from '../components/common/Spinner';
 import { deviceService } from '../services/deviceService';
 import { formatCurrency, formatEnergy } from '../utils/helpers';
 
+// Helper to format running time
+const formatRunningTime = (startDate) => {
+    if (!startDate) return null;
+    const start = new Date(startDate);
+    const now = new Date();
+    const diffMs = now - start;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+
+    if (diffHours > 0) {
+        return `${diffHours}h ${mins}m`;
+    }
+    return `${mins}m`;
+};
+
 const DeviceDetail = () => {
     const { deviceId } = useParams();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [timeRange, setTimeRange] = useState('7'); // 7 or 30 days
+    const [consumption, setConsumption] = useState(null);
+    const [runningTime, setRunningTime] = useState(null);
+    const [isToggling, setIsToggling] = useState(false);
+    const intervalRef = useRef(null);
+    const consumptionIntervalRef = useRef(null);
 
-    const { data, isLoading, error } = useQuery({
+    const { data, isLoading, error, refetch } = useQuery({
         queryKey: ['device', deviceId, timeRange],
         queryFn: () => deviceService.getDeviceDetail(deviceId, { days: parseInt(timeRange) }),
         enabled: !!deviceId,
     });
+
+    const device = data?.data;
+    const isOn = device?.isActive;
+
+    // Fetch live consumption and update running time
+    useEffect(() => {
+        if (!deviceId) return;
+
+        const fetchConsumption = async () => {
+            try {
+                const result = await deviceService.getCurrentConsumption(deviceId);
+                setConsumption(result.consumption);
+            } catch (error) {
+                console.error('Error fetching consumption:', error);
+            }
+        };
+
+        fetchConsumption();
+
+        if (isOn && device?.lastTurnedOn) {
+            setRunningTime(formatRunningTime(device.lastTurnedOn));
+
+            intervalRef.current = setInterval(() => {
+                setRunningTime(formatRunningTime(device.lastTurnedOn));
+            }, 1000);
+
+            consumptionIntervalRef.current = setInterval(fetchConsumption, 5000);
+        } else {
+            setRunningTime(null);
+        }
+
+        return () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            if (consumptionIntervalRef.current) clearInterval(consumptionIntervalRef.current);
+        };
+    }, [deviceId, isOn, device?.lastTurnedOn]);
+
+    const handleToggle = async () => {
+        setIsToggling(true);
+        try {
+            const response = await deviceService.toggleDevice(deviceId);
+            const isNowActive = response.device?.isActive;
+            toast.success(`Device ${isNowActive ? 'turned on - consumption tracking started' : 'turned off - consumption recorded'}`);
+            refetch();
+        } catch (error) {
+            toast.error('Failed to toggle device');
+        } finally {
+            setIsToggling(false);
+        }
+    };
 
     if (isLoading) {
         return (
@@ -47,7 +120,6 @@ const DeviceDetail = () => {
         );
     }
 
-    const device = data.data;
     const consumptionData = device.consumptionHistory || [];
     const dailyData = device.dailyBreakdown || [];
 
@@ -63,20 +135,81 @@ const DeviceDetail = () => {
                         <ArrowLeft className="h-5 w-5" />
                         <span>Back to Devices</span>
                     </button>
+
+                    {/* Toggle Button */}
+                    <Button
+                        onClick={handleToggle}
+                        disabled={isToggling}
+                        className={isOn ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 hover:bg-gray-700'}
+                    >
+                        <Power className={`h-4 w-4 mr-2 ${isToggling ? 'animate-pulse' : ''}`} />
+                        {isToggling ? 'Toggling...' : (isOn ? 'Turn Off' : 'Turn On')}
+                    </Button>
                 </div>
+
+                {/* Live Consumption Banner (when device is on) */}
+                {isOn && (
+                    <Card className="bg-gradient-to-r from-green-500 to-emerald-600 text-white">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                                <div className="p-3 bg-white/20 rounded-full">
+                                    <Activity className="h-8 w-8" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center space-x-2">
+                                        <p className="text-sm opacity-90">Live Consumption</p>
+                                        <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                                    </div>
+                                    <p className="text-3xl font-bold">{consumption?.currentWatts || device.wattage || 0}W</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                {runningTime && (
+                                    <div className="flex items-center text-white/90 mb-2">
+                                        <Clock className="h-4 w-4 mr-2" />
+                                        Running for {runningTime}
+                                    </div>
+                                )}
+                                {consumption && (
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                            <p className="opacity-75">Session Energy</p>
+                                            <p className="font-semibold">{consumption.sessionKWh?.toFixed(4) || '0'} kWh</p>
+                                        </div>
+                                        <div>
+                                            <p className="opacity-75">Session Cost</p>
+                                            <p className="font-semibold">${consumption.sessionCost?.toFixed(4) || '0'}</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </Card>
+                )}
 
                 {/* Device Overview */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     {/* Basic Info */}
                     <Card>
                         <div className="text-center">
-                            <Lightbulb className="mx-auto h-12 w-12 text-blue-600 mb-4" />
+                            <div className="relative inline-block">
+                                <Lightbulb className={`mx-auto h-12 w-12 ${isOn ? 'text-yellow-500' : 'text-gray-400'} mb-4`} />
+                                {isOn && (
+                                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse"></span>
+                                )}
+                            </div>
                             <h3 className="font-semibold text-gray-900 mb-2">{device.name}</h3>
                             <p className="text-sm text-gray-600">{device.location}</p>
-                            <div className="mt-4 flex justify-center">
-                                <Badge variant={device.isActive ? 'success' : 'secondary'}>
-                                    {device.isActive ? 'Active' : 'Inactive'}
+                            <div className="mt-4 flex justify-center space-x-2">
+                                <Badge variant={isOn ? 'success' : 'secondary'}>
+                                    {isOn ? 'Active' : 'Inactive'}
                                 </Badge>
+                                {isOn && (
+                                    <span className="flex items-center text-xs text-green-600">
+                                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-1"></span>
+                                        Live
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </Card>
@@ -131,8 +264,8 @@ const DeviceDetail = () => {
                                         key={days}
                                         onClick={() => setTimeRange(days)}
                                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${timeRange === days
-                                                ? 'bg-blue-100 text-blue-700'
-                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            ? 'bg-blue-100 text-blue-700'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                             }`}
                                     >
                                         {days} Days

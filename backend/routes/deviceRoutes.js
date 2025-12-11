@@ -8,6 +8,8 @@ const {
     deleteDevice,
     getDeviceTemplates,
     getDeviceStats,
+    toggleDevice,
+    getCurrentConsumption,
 } = require('../controllers/deviceController');
 const { protect, validateDevice, validateMongoId } = require('../middleware');
 
@@ -29,5 +31,9 @@ router.route('/:id')
 
 // Device statistics
 router.get('/:id/stats', validateMongoId('id'), getDeviceStats);
+
+// Device toggle and consumption
+router.put('/:id/toggle', validateMongoId('id'), toggleDevice);
+router.get('/:id/consumption', validateMongoId('id'), getCurrentConsumption);
 
 module.exports = router;

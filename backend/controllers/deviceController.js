@@ -319,6 +319,144 @@ const getDeviceStats = asyncHandler(async (req, res) => {
     });
 });
 
+/**
+ * @desc    Toggle device on/off and start/stop consumption tracking
+ * @route   PUT /api/devices/:id/toggle
+ * @access  Private
+ */
+const toggleDevice = asyncHandler(async (req, res) => {
+    const device = await Device.findById(req.params.id).populate('home', 'user electricityRate');
+
+    if (!device) {
+        return res.status(404).json({
+            success: false,
+            message: 'Device not found',
+        });
+    }
+
+    // Check ownership
+    if (device.home.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        return res.status(403).json({
+            success: false,
+            message: 'Not authorized to toggle this device',
+        });
+    }
+
+    // Toggle the device status
+    const newStatus = !device.isActive;
+    device.isActive = newStatus;
+
+    // Store when device was turned on/off
+    if (newStatus) {
+        device.lastTurnedOn = new Date();
+    } else {
+        // Calculate consumption for the session when turning off
+        if (device.lastTurnedOn) {
+            const sessionDuration = (new Date() - device.lastTurnedOn) / (1000 * 60 * 60); // hours
+            const sessionKWh = (device.wattage * sessionDuration) / 1000;
+            const electricityRate = device.home.electricityRate || 0.12;
+            const sessionCost = sessionKWh * electricityRate;
+
+            // Create a reading for this session
+            await Reading.create({
+                device: device._id,
+                home: device.home._id,
+                kWh: parseFloat(sessionKWh.toFixed(4)),
+                watts: device.wattage,
+                voltage: 120,
+                current: device.wattage / 120,
+                powerFactor: 0.95,
+                duration: Math.round(sessionDuration * 60), // minutes
+                timestamp: new Date(),
+                isSimulated: false,
+                cost: parseFloat(sessionCost.toFixed(4)),
+            });
+        }
+        device.lastTurnedOff = new Date();
+    }
+
+    await device.save();
+
+    res.status(200).json({
+        success: true,
+        message: `Device turned ${newStatus ? 'on' : 'off'}`,
+        device: {
+            _id: device._id,
+            name: device.name,
+            isActive: device.isActive,
+            lastTurnedOn: device.lastTurnedOn,
+            lastTurnedOff: device.lastTurnedOff,
+        },
+    });
+});
+
+/**
+ * @desc    Get current consumption for active device
+ * @route   GET /api/devices/:id/consumption
+ * @access  Private
+ */
+const getCurrentConsumption = asyncHandler(async (req, res) => {
+    const device = await Device.findById(req.params.id).populate('home', 'user electricityRate');
+
+    if (!device) {
+        return res.status(404).json({
+            success: false,
+            message: 'Device not found',
+        });
+    }
+
+    // Check ownership
+    if (device.home.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        return res.status(403).json({
+            success: false,
+            message: 'Not authorized to access this device',
+        });
+    }
+
+    if (!device.isActive) {
+        return res.status(200).json({
+            success: true,
+            device: {
+                _id: device._id,
+                name: device.name,
+                isActive: false,
+            },
+            consumption: {
+                currentWatts: 0,
+                sessionKWh: 0,
+                sessionCost: 0,
+                sessionDuration: 0,
+            },
+        });
+    }
+
+    // Calculate current session consumption
+    const sessionStart = device.lastTurnedOn || new Date();
+    const sessionDuration = (new Date() - sessionStart) / (1000 * 60 * 60); // hours
+    const sessionKWh = (device.wattage * sessionDuration) / 1000;
+    const electricityRate = device.home.electricityRate || 0.12;
+    const sessionCost = sessionKWh * electricityRate;
+
+    res.status(200).json({
+        success: true,
+        device: {
+            _id: device._id,
+            name: device.name,
+            type: device.type,
+            wattage: device.wattage,
+            isActive: device.isActive,
+        },
+        consumption: {
+            currentWatts: device.wattage,
+            sessionKWh: parseFloat(sessionKWh.toFixed(4)),
+            sessionCost: parseFloat(sessionCost.toFixed(4)),
+            sessionDuration: parseFloat((sessionDuration * 60).toFixed(2)), // minutes
+            sessionStart: sessionStart,
+            electricityRate: electricityRate,
+        },
+    });
+});
+
 module.exports = {
     createDevice,
     getHomeDevices,
@@ -327,4 +465,6 @@ module.exports = {
     deleteDevice,
     getDeviceTemplates,
     getDeviceStats,
+    toggleDevice,
+    getCurrentConsumption,
 };

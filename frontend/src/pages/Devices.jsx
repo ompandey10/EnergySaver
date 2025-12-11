@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Lightbulb, Plus, Power, Search } from 'lucide-react';
+import { Lightbulb, Plus, Power, Search, Zap, Clock, Activity } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import Card from '../components/common/Card';
@@ -12,8 +12,212 @@ import Badge from '../components/common/Badge';
 import AddDeviceModal from '../components/devices/AddDeviceModal';
 import { deviceService } from '../services/deviceService';
 import { homeService } from '../services/homeService';
-import { formatEnergy, getStatusColor } from '../utils/helpers';
+import { formatEnergy, formatCurrency } from '../utils/helpers';
 import { useAuth } from '../contexts/AuthContext';
+
+// Helper to format running time
+const formatRunningTime = (startDate) => {
+    if (!startDate) return null;
+    const start = new Date(startDate);
+    const now = new Date();
+    const diffMs = now - start;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+
+    if (diffHours > 0) {
+        return `${diffHours}h ${mins}m`;
+    }
+    return `${mins}m`;
+};
+
+// Device Card Component with real-time consumption tracking
+const DeviceCard = ({ device, onToggle }) => {
+    const navigate = useNavigate();
+    const [consumption, setConsumption] = useState(null);
+    const [runningTime, setRunningTime] = useState(null);
+    const [isToggling, setIsToggling] = useState(false);
+    const intervalRef = useRef(null);
+    const consumptionIntervalRef = useRef(null);
+
+    const isOn = device.isActive || device.isOn;
+
+    // Fetch consumption data and update running time
+    useEffect(() => {
+        const fetchConsumption = async () => {
+            try {
+                const data = await deviceService.getCurrentConsumption(device._id);
+                setConsumption(data.consumption);
+            } catch (error) {
+                console.error('Error fetching consumption:', error);
+            }
+        };
+
+        // Initial fetch
+        fetchConsumption();
+
+        // If device is on, update running time every second and consumption every 5 seconds
+        if (isOn && device.lastTurnedOn) {
+            setRunningTime(formatRunningTime(device.lastTurnedOn));
+
+            // Update running time every second
+            intervalRef.current = setInterval(() => {
+                setRunningTime(formatRunningTime(device.lastTurnedOn));
+            }, 1000);
+
+            // Update consumption every 5 seconds
+            consumptionIntervalRef.current = setInterval(() => {
+                fetchConsumption();
+            }, 5000);
+        } else {
+            setRunningTime(null);
+        }
+
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+            }
+            if (consumptionIntervalRef.current) {
+                clearInterval(consumptionIntervalRef.current);
+            }
+        };
+    }, [device._id, isOn, device.lastTurnedOn]);
+
+    const handleToggle = async (e) => {
+        e.stopPropagation();
+        setIsToggling(true);
+        try {
+            await onToggle(device._id);
+        } finally {
+            setIsToggling(false);
+        }
+    };
+
+    const handleClick = () => {
+        navigate(`/devices/${device._id}`);
+    };
+
+    const getDeviceIcon = () => {
+        const type = device.type || device.category || '';
+        switch (type.toLowerCase()) {
+            case 'hvac':
+            case 'air_conditioner':
+                return '❄️';
+            case 'lighting':
+            case 'light':
+                return '💡';
+            case 'refrigerator':
+            case 'appliance':
+                return '🏠';
+            case 'washer':
+            case 'dryer':
+                return '👕';
+            case 'entertainment':
+            case 'tv':
+                return '📺';
+            default:
+                return '⚡';
+        }
+    };
+
+    return (
+        <Card
+            className={`cursor-pointer hover:shadow-lg transition-all duration-200 ${isOn ? 'ring-2 ring-green-400 bg-green-50/30' : ''}`}
+            onClick={handleClick}
+        >
+            <div className="p-4">
+                {/* Header with device icon and power toggle */}
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                        <div className={`text-2xl p-2 rounded-lg ${isOn ? 'bg-green-100' : 'bg-gray-100'}`}>
+                            {getDeviceIcon()}
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-gray-900">{device.name}</h3>
+                            <p className="text-xs text-gray-500">{device.location || 'No location'}</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleToggle}
+                        disabled={isToggling}
+                        className={`p-2 rounded-full transition-all duration-200 ${isOn
+                            ? 'bg-green-500 text-white hover:bg-green-600'
+                            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                            } ${isToggling ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        <Power className={`h-5 w-5 ${isToggling ? 'animate-pulse' : ''}`} />
+                    </button>
+                </div>
+
+                {/* Status Badge */}
+                <div className="flex items-center space-x-2 mb-3">
+                    <Badge variant={isOn ? 'success' : 'secondary'}>
+                        {isOn ? 'Active' : 'Off'}
+                    </Badge>
+                    {isOn && (
+                        <span className="flex items-center text-xs text-green-600">
+                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-1"></span>
+                            Live
+                        </span>
+                    )}
+                </div>
+
+                {/* Power Rating */}
+                <div className="flex items-center text-sm text-gray-600 mb-3">
+                    <Zap className="h-4 w-4 mr-1 text-yellow-500" />
+                    <span>{device.powerRating || 0}W rated power</span>
+                </div>
+
+                {/* Running Time (when device is on) */}
+                {isOn && runningTime && (
+                    <div className="flex items-center text-sm text-green-600 mb-3 bg-green-100 px-2 py-1 rounded">
+                        <Clock className="h-4 w-4 mr-1" />
+                        <span>Running for {runningTime}</span>
+                    </div>
+                )}
+
+                {/* Current Session Stats (when device is on) */}
+                {isOn && consumption && (
+                    <div className="border-t pt-3 mt-3">
+                        <div className="bg-green-50 rounded-lg p-3">
+                            <div className="text-xs font-medium text-green-700 mb-2 flex items-center">
+                                <Activity className="h-3 w-3 mr-1" />
+                                Live Consumption
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <div className="text-xs text-green-600">Current Power</div>
+                                    <div className="font-semibold text-green-700">{consumption.currentWatts || 0}W</div>
+                                </div>
+                                <div>
+                                    <div className="text-xs text-green-600">Session Energy</div>
+                                    <div className="font-semibold text-green-700">{consumption.sessionKWh?.toFixed(4) || '0.0000'} kWh</div>
+                                </div>
+                                <div>
+                                    <div className="text-xs text-green-600">Duration</div>
+                                    <div className="font-semibold text-green-700">{consumption.sessionDuration?.toFixed(1) || '0'} min</div>
+                                </div>
+                                <div>
+                                    <div className="text-xs text-green-600">Est. Cost</div>
+                                    <div className="font-semibold text-blue-600">${consumption.sessionCost?.toFixed(4) || '0.0000'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Off state message */}
+                {!isOn && (
+                    <div className="border-t pt-3 mt-3">
+                        <div className="text-xs text-gray-500 text-center">
+                            Turn on device to start tracking consumption
+                        </div>
+                    </div>
+                )}
+            </div>
+        </Card>
+    );
+};
 
 const Devices = () => {
     const { user } = useAuth();
@@ -51,10 +255,11 @@ const Devices = () => {
         queryClient.invalidateQueries({ queryKey: ['devices', primaryHomeId] });
     };
 
-    const handleToggleDevice = async (deviceId, currentState) => {
+    const handleToggleDevice = async (deviceId) => {
         try {
-            await deviceService.toggleDevice(deviceId, currentState);
-            toast.success(`Device ${currentState ? 'turned off' : 'turned on'} successfully!`);
+            const response = await deviceService.toggleDevice(deviceId);
+            const isNowActive = response.device?.isActive;
+            toast.success(`Device ${isNowActive ? 'turned on - consumption tracking started' : 'turned off - consumption recorded'}`);
             // Refetch devices to get updated state
             queryClient.invalidateQueries({ queryKey: ['devices', primaryHomeId] });
         } catch (error) {
@@ -154,47 +359,11 @@ const Devices = () => {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredDevices.map((device) => (
-                            <Card key={device._id}>
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="flex items-center space-x-3">
-                                        <div className={`p-2 rounded-lg ${device.isActive ? 'bg-green-100' : 'bg-gray-100'}`}>
-                                            <Lightbulb className={`h-6 w-6 ${device.isActive ? 'text-green-600' : 'text-gray-400'}`} />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-sm font-semibold text-gray-900">{device.name}</h3>
-                                            <p className="text-xs text-gray-600">{device.location}</p>
-                                        </div>
-                                    </div>
-                                    <Badge variant={device.isActive ? 'success' : 'default'}>
-                                        {device.isActive ? 'Active' : 'Inactive'}
-                                    </Badge>
-                                </div>
-
-                                <div className="space-y-2 mb-4">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-600">Category</span>
-                                        <span className="font-medium">{device.type || device.category}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-600">Wattage</span>
-                                        <span className="font-medium">{device.wattage}W</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-600">Consumption</span>
-                                        <span className="font-medium">{formatEnergy(device.totalConsumption || 0)}</span>
-                                    </div>
-                                </div>
-
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="w-full"
-                                    onClick={() => handleToggleDevice(device._id, device.isActive)}
-                                >
-                                    <Power className={`h-4 w-4 mr-2 ${device.isActive ? 'text-green-600' : 'text-gray-400'}`} />
-                                    {device.isActive ? 'Turn Off' : 'Turn On'}
-                                </Button>
-                            </Card>
+                            <DeviceCard
+                                key={device._id}
+                                device={device}
+                                onToggle={handleToggleDevice}
+                            />
                         ))}
                     </div>
                 )}
